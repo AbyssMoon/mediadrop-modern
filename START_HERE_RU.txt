@@ -1,0 +1,545 @@
+MEDIADROP MODERN — КОНТЕКСТ ПРОЕКТА И ПЕРЕДАЧА РАБОТ
+Версия кода в этом архиве: 0.4.0
+Дата состояния: 2026-09-20
+
+Этот файл предназначен для нового разработчика или нейросети, которая должна быстро
+понять задачу, текущее состояние проекта и продолжить работу без повторного анализа
+всего legacy MediaDrop.
+
+================================================================================
+1. ИСХОДНАЯ ЗАДАЧА
+================================================================================
+
+Исходный продукт: MediaDrop (github.com/mediadrop/mediadrop).
+
+Цель — перенести существующую рабочую инсталляцию MediaDrop в современное,
+поддерживаемое окружение, сохранив данные, привычную концепцию продукта и основной
+функционал. Точная копия старого интерфейса не требуется, но существующий пользователь
+после обновления не должен попадать в совершенно другой продукт.
+
+Главные условия:
+- функциональность по возможности сохранить;
+- допускается упрощение, если оно заметно уменьшает legacy и стоимость поддержки;
+- transcoding/encoding больше не нужен: в систему загружаются уже готовые web-ready
+  видеофайлы;
+- старую базу данных и существующий каталог файлов нужно использовать без массовой
+  миграции на первом этапе;
+- нужен Docker/Compose и простой production deployment;
+- основной язык существующей установки — русский;
+- старые превью, категории, теги, подкасты, комментарии, настройки и пользователи
+  должны переноситься;
+- отдельный wheel-артефакт сейчас НЕ нужен. Docker собирает приложение из исходников.
+
+================================================================================
+2. ЧТО БЫЛО В LEGACY
+================================================================================
+
+Старый MediaDrop был приложением Python 2.6/2.7 на Pylons/Paste/Routes/Genshi с
+очень старым SQLAlchemy/Alembic, repoze.who, ToscaWidgets и отдельной системой
+players/storage/transcoding.
+
+Проблема оказалась не в бизнес-логике, а в инфраструктурном слое: попытка просто
+"обновить зависимости" оставила бы почти весь сложный и давно неподдерживаемый стек.
+
+В исходной БД присутствуют, среди прочего:
+- media, media_files, media_files_meta, media_meta;
+- categories, media_categories;
+- tags, media_tags;
+- comments;
+- podcasts;
+- users, groups, permissions, users_groups, groups_permissions;
+- settings, settings_multi;
+- storage;
+- players;
+- media_fulltext;
+- alembic_migrations.
+
+Старый MySQL был 5.5.x. Default сервера был latin1, но почти все прикладные таблицы
+MediaDrop были utf8_general_ci. Dump был снят с --default-character-set=utf8.
+
+================================================================================
+3. ГЛАВНОЕ АРХИТЕКТУРНОЕ РЕШЕНИЕ
+================================================================================
+
+Самый важный поворот: мы отказались от идеи переносить старый framework слой.
+
+Вместо модернизации Pylons создан НОВЫЙ небольшой runtime, который считает
+compatibility boundary следующими вещами:
+- существующая SQL-схема и ключевые имена таблиц/колонок;
+- существующие media_files.unique_id и layout файлов;
+- основные старые URL;
+- семантика публикации media;
+- категории, теги, подкасты, комментарии, пользователи и полезные settings.
+
+То есть web/runtime слой новый, а данные остаются совместимыми.
+
+Текущий стек:
+- Python 3.13 (проект требует >=3.12);
+- FastAPI / Starlette;
+- SQLAlchemy 2.x;
+- Jinja2;
+- обычный CSS, без React/Vue/Node/npm;
+- Uvicorn;
+- MariaDB 11.4 через Docker Compose;
+- Pillow для превью;
+- нативные HTML5 <video>/<audio>;
+- pytest.
+
+Удалено намеренно:
+- Pylons / Paste / Routes / ToscaWidgets / Genshi runtime;
+- старый plugin runtime;
+- transcoding/encoding workers, очереди, профили и FFmpeg orchestration;
+- Flash/RTMP;
+- старый player-selection framework;
+- legacy UI настроек, относящийся к encoder/player эпохе.
+
+Теперь encoded=true означает: к материалу уже прикреплен готовый для браузера файл.
+Никакой автоматической конвертации после upload нет.
+
+================================================================================
+4. ЧТО УЖЕ РЕАЛИЗОВАНО
+================================================================================
+
+PUBLIC:
+- главная / с информационной архитектурой, близкой к классическому MediaDrop:
+  крупный popular/featured материал, популярные и последние материалы;
+- /media — библиотека и поиск;
+- /categories — категории;
+- /tags — теги;
+- /podcasts — подкасты;
+- страницы media и podcast;
+- comments;
+- like/dislike;
+- download, если разрешен настройкой;
+- RSS / podcast feeds / sitemap, если включены;
+- JSON API под /api;
+- старые формы URL вида /media/<slug>/view и podcast URL сохранены там, где нужно.
+
+ADMIN:
+- dashboard;
+- media create/edit/delete;
+- загрузка готового video/audio;
+- загрузка preview при создании/редактировании media;
+- comments и moderation;
+- categories;
+- podcasts;
+- users;
+- settings.
+
+SETTINGS:
+Полезные настройки сохраняются в старую таблицу settings(key,value), чтобы старые
+значения могли подхватываться после импорта:
+- название сайта;
+- default language;
+- featured category;
+- comments и moderation;
+- public uploads и лимит;
+- podcasts;
+- download / like / dislike;
+- RSS / sitemap;
+- accent color;
+- footer text.
+
+ЯЗЫКИ:
+В selector добавлены исторические locale MediaDrop:
+ru, en, ar, bg, cs, de, el, es, fi, fr, he, hu, it, ja, pl, pt_BR, ro, sk,
+sl, sv, tr, uk, zh_CN.
+
+Русский и английский покрывают текущий UI наиболее полно. Для других языков часть
+общих строк уже есть, отсутствующие строки fallback-ятся на английский. Arabic/Hebrew
+поддерживают RTL. Полный перенос старых gettext-каталогов еще не закончен.
+
+AUTH:
+Для переходного периода поддержана проверка старого MediaDrop password hash
+(40-char salt + SHA1 digest, итого 80 chars). Это сделано, чтобы существующие admin
+могли войти сразу после импорта. Создание паролей пока тоже использует legacy format.
+Это временная совместимость, а не окончательное security решение.
+
+MEDIA STORAGE:
+Новые файлы пишутся в writable /data/media.
+Старый архив монтируется read-only в /data/legacy-media.
+При выдаче файл сначала ищется в modern root, затем в legacy root.
+
+PREVIEWS:
+Новые превью пишутся в writable /data/images/media.
+Legacy images монтируются read-only в /data/legacy-images.
+Поддерживается старый MediaDrop layout:
+  images/media/<media_id>s.jpg
+  images/media/<media_id>m.jpg
+  images/media/<media_id>l.jpg
+  images/media/<media_id>orig.<ext>
+
+При upload нового preview принимаются JPEG/PNG/WebP, сохраняется original и создаются
+JPEG варианты 16:9:
+- s: 160x90;
+- m: 320x180;
+- l: 640x360.
+
+================================================================================
+5. ЧТО УЖЕ ПРОВЕРЕНО НА РЕАЛЬНЫХ LEGACY ДАННЫХ
+================================================================================
+
+Пользователь импортировал реальный dump старого MediaDrop в MariaDB 11.4.
+
+Read-only compatibility check:
+  python scripts/check_legacy_db.py
+Результат:
+  Required legacy tables/columns are present. No database changes were made.
+
+Файлы:
+- 511 media_files реально используются;
+- LocalFileStorage: 511 файлов;
+- RemoteURLStorage: 0;
+- YouTube/Vimeo/BlipTV/DailyMotion: 0;
+- проверка unique_id против /opt/mediadrop_data/media дала 0 missing files;
+- в каталоге legacy media физически 512 файлов (один лишний/служебный относительно DB).
+
+Форматы media_files:
+- MP4: 443;
+- FLV: 67;
+- WEBM: 1.
+
+У каждого media сейчас один media_file: запрос на media_id с COUNT(*) > 1 не вернул
+строк.
+
+FLV:
+- 67 материалов являются FLV-only;
+- современные браузеры FLV не проигрывают;
+- принято решение пока НЕ возвращать Flash/FLV player и НЕ усложнять runtime;
+- владелец позже отдельно перекодирует эти 67 файлов в MP4. До этого вопрос отложен.
+
+Превью:
+  python scripts/check_legacy_thumbnails.py
+Реальный результат:
+  Media rows: 511
+  Modern previews: 0
+  Legacy previews: 511
+  Missing previews: 0
+
+То есть старые thumbnail layout распознан для 100% текущих media.
+
+UI после импорта реальных данных уже отображает главную с popular/latest и настоящими
+названиями/просмотрами. Код v0.4 добавляет старые thumbnail в карточки и poster video.
+
+Текущие automated tests этого архива:
+  pytest -q
+  10 passed
+
+================================================================================
+6. ПОВОРОТНЫЕ РЕШЕНИЯ, КОТОРЫЕ НЕ НАДО СЛУЧАЙНО ОТКАТЫВАТЬ
+================================================================================
+
+1) НЕ портировать Pylons один-в-один.
+   Новый runtime поверх legacy data оказался существенно проще.
+
+2) НЕ переносить transcoding.
+   Upload принимает уже готовые browser-ready файлы. Это требование владельца.
+
+3) НЕ менять сразу legacy schema.
+   Сначала функциональная совместимость и возможность rollback. После стабилизации
+   можно вводить Alembic и собственную modern schema migration.
+
+4) Legacy media/images держать read-only.
+   Новые uploads идут в отдельные Docker volumes. Так исходный архив невозможно
+   испортить modern приложением во время миграции.
+
+5) Сохранить знакомую информационную архитектуру UI, но не старый визуальный код.
+   Современный дизайн, но разделы/главная близки по смыслу к MediaDrop.
+
+6) Не возвращать FLV/Flash только ради 67 старых роликов.
+   Их проще разово перекодировать.
+
+7) Пока сохранить legacy login hash, чтобы переход был бесшовным.
+   Argon2id делать позже отдельной контролируемой migration.
+
+8) Wheel как отдельный deliverable сейчас не нужен.
+   Dockerfile делает pip install . из source tree.
+
+================================================================================
+7. ИЗВЕСТНЫЕ ПРОБЛЕМЫ И ЧТО ЕЩЕ ПРЕДСТОИТ
+================================================================================
+
+ПРИОРИТЕТ 1 — функциональный parity на реальных данных:
+- пройти representative media pages, categories, tags, podcasts, comments, admin;
+- сравнить edge cases со старым MediaDrop;
+- проверить новые upload media + preview на реальном сервере;
+- проверить удаление/редактирование modern uploads отдельно от read-only legacy files;
+- проверить RSS/sitemap/podcast feeds на production-like URL;
+- проверить права разных legacy users/groups, не только admin.
+
+ПРИОРИТЕТ 2 — FLV:
+- 67 FLV-only материалов перекодировать offline в MP4;
+- затем либо заменить соответствующие media_files записи, либо добавить новый файл
+  и удалить/архивировать FLV после проверки;
+- transcoding pipeline в приложение не возвращать.
+
+ПРИОРИТЕТ 3 — security:
+- заменить SHA1 password storage на Argon2id rehash-on-login;
+- для этого потребуется продуманная DB migration/длина поля password;
+- после переходного окна убрать генерацию новых SHA1 паролей;
+- проверить session/cookie settings за HTTPS reverse proxy.
+
+ПРИОРИТЕТ 4 — schema cleanup:
+После того как rollback к старому приложению больше не нужен:
+- завести Alembic для нового проекта;
+- привести нужные таблицы/колонки к utf8mb4/InnoDB;
+- проиндексировать реальные запросы;
+- инвентаризировать и потом удалить действительно неиспользуемые legacy tables,
+  например encoder/player/fulltext части. Не удалять их до инвентаризации.
+
+ПРИОРИТЕТ 5 — i18n:
+- полностью перенести оставшиеся старые gettext переводы в новые template keys;
+- сейчас ru/en наиболее полные, остальные имеют English fallback.
+
+ПРИОРИТЕТ 6 — production media delivery:
+- сейчас MEDIA_SERVE_MODE=app работает через приложение;
+- при большой нагрузке лучше настроить nginx X-Accel-Redirect и переключить delivery;
+- это optimization, не блокер миграции.
+
+ПРИОРИТЕТ 7 — UI polish:
+- текущий UI уже современный и концептуально близок к старому;
+- дальнейшие изменения лучше делать по реальным страницам после импорта данных;
+- не превращать проект в SPA без необходимости: Jinja + CSS достаточно.
+
+================================================================================
+8. СТРУКТУРА КОДА
+================================================================================
+
+app/main.py           — создание FastAPI app/middleware/static/routes
+app/config.py         — environment settings
+app/database.py       — SQLAlchemy engine/session
+app/models.py         — ORM mapping к совместимой legacy schema
+app/security.py       — session, CSRF, legacy password verification
+app/services.py       — uploads, media paths, thumbnails, tags/categories, helpers
+app/site_settings.py  — чтение/запись полезных legacy settings
+app/i18n.py           — locale/translation layer
+app/routes_public.py  — публичные страницы/feed/files/comments/ratings
+app/routes_admin.py   — admin CRUD/settings/uploads
+app/routes_auth.py    — login/logout
+app/routes_api.py     — JSON API
+app/templates/        — Jinja templates
+app/static/           — CSS/assets
+scripts/check_legacy_db.py          — read-only schema compatibility check
+scripts/check_legacy_thumbnails.py  — read-only preview compatibility check
+tests/                — smoke/integration tests
+compose.yml           — MariaDB + app + volumes
+Dockerfile            — production app image
+.env.example          — template environment
+README.md             — техническая инструкция
+MIGRATION_NOTES.md    — краткие архитектурные заметки
+START_HERE_RU.txt     — этот handoff/context
+
+================================================================================
+9. БЫСТРОЕ РАЗВЕРТЫВАНИЕ С НУЛЯ — ПУСТАЯ НОВАЯ УСТАНОВКА
+================================================================================
+
+Требования на сервере:
+- Docker Engine;
+- Docker Compose v2 (`docker compose`);
+- желательно nginx/Caddy перед приложением.
+
+1. Распаковать архив, например:
+
+  mkdir -p /opt/mediadrop-modern
+  cd /opt/mediadrop-modern
+  tar xzf mediadrop-modern-v4-handoff.tar.gz --strip-components=1
+
+2. Создать env:
+
+  cp .env.example .env
+  nano .env
+
+Обязательно заменить:
+  DB_PASSWORD
+  DB_ROOT_PASSWORD
+  SECRET_KEY
+
+Для прямого теста по обычному HTTP:
+  COOKIE_SECURE=false
+
+Для production за HTTPS:
+  COOKIE_SECURE=true
+
+По умолчанию приложение слушает только 127.0.0.1:8080. Если временно нужен прямой
+доступ извне, поставить BIND_ADDR=0.0.0.0, но лучше использовать reverse proxy/firewall.
+
+3. Чтобы Compose не создавал случайные host directories, можно подготовить пустой
+legacy root даже для новой установки:
+
+  mkdir -p /opt/mediadrop_data/media /opt/mediadrop_data/images
+
+4. Build и новая DB:
+
+  docker compose build
+  docker compose up -d db
+  docker compose run --rm app mediadrop init-db
+  docker compose run --rm app mediadrop create-admin admin admin@example.com
+  docker compose up -d
+
+5. Проверка:
+
+  docker compose ps
+  docker compose logs --tail=100 app
+  curl -fsS http://127.0.0.1:8080/healthz
+
+ВАЖНО: init-db используется ТОЛЬКО для новой пустой установки.
+
+================================================================================
+10. РАЗВЕРТЫВАНИЕ С НУЛЯ С ИМПОРТОМ СТАРОГО MEDIADROP
+================================================================================
+
+Ожидаемый legacy layout на host:
+
+  /opt/mediadrop_data/
+    media/
+    images/
+    mediadrop.sql.gz
+    appearance/        # может храниться как архив, runtime сейчас не использует
+    i18n/              # может храниться как архив, runtime сейчас не использует
+    deleted/           # runtime не нужен
+    tmp/               # runtime не нужен
+    python-egg-cache/  # runtime не нужен
+
+В .env:
+  LEGACY_DATA_ROOT=/opt/mediadrop_data
+
+Compose монтирует:
+  /opt/mediadrop_data/media  -> /data/legacy-media:ro
+  /opt/mediadrop_data/images -> /data/legacy-images:ro
+
+Новые файлы НЕ пишутся туда. Они идут в Docker volumes:
+  mediadrop_media  -> /data/media
+  mediadrop_images -> /data/images
+
+ШАГ 1. Проверить dump:
+
+  gzip -t /opt/mediadrop_data/mediadrop.sql.gz
+  echo $?
+
+Ожидается 0.
+
+ШАГ 2. Собрать и запустить DB:
+
+  cd /opt/mediadrop-modern
+  docker compose build
+  docker compose up -d db
+
+ШАГ 3. Импортировать dump.
+Если в DB уже была тестовая modern база, сначала можно сохранить ее, затем пересоздать.
+Для чистого migration окружения:
+
+  docker compose exec -T db sh -lc \
+    'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" -e "
+      DROP DATABASE IF EXISTS ${MARIADB_DATABASE};
+      CREATE DATABASE ${MARIADB_DATABASE}
+      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    "'
+
+  gzip -dc /opt/mediadrop_data/mediadrop.sql.gz | \
+    docker compose exec -T db sh -lc \
+      'mariadb --default-character-set=utf8 \
+       -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'
+
+НЕ запускать `mediadrop init-db` после импорта legacy dump.
+
+ШАГ 4. Read-only schema check:
+
+  docker compose run --rm app python scripts/check_legacy_db.py
+
+Ожидаемый успешный результат:
+  Required legacy tables/columns are present. No database changes were made.
+
+ШАГ 5. Проверить thumbnails:
+
+  docker compose run --rm app python scripts/check_legacy_thumbnails.py
+
+Для текущей реальной установки получено:
+  Media rows: 511
+  Legacy previews: 511
+  Missing previews: 0
+
+ШАГ 6. Запустить приложение:
+
+  docker compose up -d --force-recreate app
+  docker compose ps
+  docker compose logs --tail=100 app
+
+ШАГ 7. Проверить UI и representative content:
+- главная;
+- несколько MP4 media pages;
+- categories/tags;
+- admin login;
+- settings;
+- comments;
+- preview images;
+- новый upload MP4 + preview.
+
+================================================================================
+11. КОМАНДЫ ДИАГНОСТИКИ
+================================================================================
+
+Health:
+  curl -fsS http://127.0.0.1:8080/healthz
+
+Logs:
+  docker compose logs -f app
+
+Все services:
+  docker compose ps
+
+Проверить, что legacy media видны в container:
+  docker compose exec app sh -lc 'find /data/legacy-media -maxdepth 1 -type f | wc -l'
+
+Проверить конкретный legacy файл:
+  docker compose exec app ls -lh /data/legacy-media/<unique_id>
+
+Проверить schema:
+  docker compose run --rm app python scripts/check_legacy_db.py
+
+Проверить previews:
+  docker compose run --rm app python scripts/check_legacy_thumbnails.py
+
+Тесты разработки:
+  pytest -q
+
+После обновления source tree:
+  docker compose build
+  docker compose up -d
+  docker compose logs --tail=100 app
+
+Не использовать `docker compose down -v`, если нет осознанного желания удалить Docker
+volumes с MariaDB и modern uploads.
+
+================================================================================
+12. SECURITY / PRODUCTION ЗАМЕТКИ
+================================================================================
+
+- Не хранить реальный .env в git/archive.
+- SECRET_KEY и DB passwords должны быть длинными случайными значениями.
+- Legacy media/images лучше оставлять :ro до полного завершения миграции.
+- Не публиковать Uvicorn:8080 напрямую без необходимости.
+- Использовать nginx/Caddy + HTTPS.
+- COOKIE_SECURE=true только когда сайт реально открывается по HTTPS; при HTTP тесте
+  оно должно быть false, иначе login cookie не будет отправляться браузером.
+- Legacy SHA1 passwords временные и должны быть заменены после принятия modern runtime.
+- Схему legacy DB пока не "чистить" вручную: сначала функциональный parity и backup.
+
+================================================================================
+13. ЧТО СЧИТАТЬ SOURCE OF TRUTH ДЛЯ ПРОДОЛЖЕНИЯ
+================================================================================
+
+1. Код в этом архиве — текущая modern база.
+2. Реальная импортированная legacy DB и /opt/mediadrop_data — источник фактических
+   production edge cases.
+3. Не пытаться заново портировать upstream Pylons приложение целиком.
+4. При несовпадении поведения сначала адаптировать modern runtime к реально
+   используемым данным/функциям, а не восстанавливать всю старую инфраструктуру.
+5. Любые destructive schema/file migrations делать только после backup и только когда
+   возможность rollback к legacy версии больше не нужна.
+6. Wheel отдельно не собирать без новой необходимости пользователя.
+
+ТЕКУЩАЯ ТОЧКА:
+Modern runtime работает на реальной legacy DB, все 511 используемых media files найдены,
+все 511 legacy previews найдены, основной UI и admin работают. Главные открытые задачи —
+проверка функционального parity на реальных данных, последующий offline FLV->MP4 для 67
+старых роликов, security migration паролей, полный i18n и поздняя очистка legacy schema.

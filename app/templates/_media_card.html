@@ -1,0 +1,18 @@
+{% macro media_card(item) -%}
+{% set thumb = thumbnail_url(item, 'm') %}
+<article class="media-card">
+  <a class="media-card__visual tone-{{ (item.id or 0) % 6 }}" href="{{ media_url(item) }}" aria-label="{{ item.title }}">
+    {% if thumb %}<img class="media-card__image" src="{{ thumb }}" alt="" loading="lazy">{% endif %}
+    <span class="media-card__kind">{% if item.type == 'audio' %}{{ t('media.listen') }}{% else %}{{ t('media.watch') }}{% endif %}</span>
+    <span class="media-card__play" aria-hidden="true"><span></span></span>
+  </a>
+  <div class="media-card__body">
+    <h3 class="media-card__title"><a href="{{ media_url(item) }}">{{ item.title }}</a></h3>
+    {% if item.description_plain %}<p class="media-card__description">{{ item.description_plain|truncate(120, true, '…') }}</p>{% endif %}
+    <div class="media-card__meta">
+      <span>{{ views_text(item.views) }}</span>
+      {% if item.publish_on %}<span>{{ format_date(item.publish_on) }}</span>{% endif %}
+    </div>
+  </div>
+</article>
+{%- endmacro %}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="{{ locale }}" dir="{{ locale_dir }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="{{ site.accent_color }}">
+  <title>{% block title %}{{ site.site_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css?v=3">
+</head>
+<body style="--primary: {{ site.accent_color }}">
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="/" aria-label="{{ site.site_name }}">
+        <span class="brand__mark" aria-hidden="true"><span></span></span>
+        <span>{{ site.site_name }}</span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Primary">
+        <a class="nav-link {% if request.url.path == '/' %}is-active{% endif %}" href="/">{{ t('nav.overview') }}</a>
+        <a class="nav-link {% if request.url.path.startswith('/media') or request.url.path.startswith('/tags') %}is-active{% endif %}" href="/media">{{ t('nav.media') }}</a>
+        {% if site.enable_podcasts %}<a class="nav-link {% if request.url.path.startswith('/podcasts') %}is-active{% endif %}" href="/podcasts">{{ t('nav.podcasts') }}</a>{% endif %}
+        <a class="nav-link {% if request.url.path.startswith('/categories') %}is-active{% endif %}" href="/categories">{{ t('nav.categories') }}</a>
+      </nav>
+
+      <div class="header-actions">
+        <form class="header-search" method="get" action="/media" role="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+          <input name="q" aria-label="{{ t('media.search') }}" placeholder="{{ t('media.search') }}">
+        </form>
+        <details class="language-menu">
+          <summary title="{{ t('common.language') }}"><span>{{ locale_name }}</span><b>⌄</b></summary>
+          <div class="language-menu__panel">
+            {% for code, meta in locales.items() %}
+              <a class="{% if code == locale %}is-active{% endif %}" href="/language/{{ code }}?next={{ request.url.path|urlencode }}">{{ meta.name }}</a>
+            {% endfor %}
+          </div>
+        </details>
+        {% if request.session.get('user_id') %}
+          <a class="header-button {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">{{ t('nav.admin') }}</a>
+        {% else %}
+          <a class="header-button" href="/login">{{ t('nav.login') }}</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">{% block content %}{% endblock %}</main>
+
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div class="footer-brand">
+        <span class="brand__mark brand__mark--small" aria-hidden="true"><span></span></span>
+        <span>{{ site.site_name }}</span>
+      </div>
+      <div class="footer-links">
+        {% if site.footer_text %}<span>{{ site.footer_text }}</span>{% else %}<span>{{ t('footer.runtime') }}</span>{% endif %}
+        <a href="/tags">{{ t('nav.tags') }}</a>
+        <a href="/api/docs">{{ t('footer.api') }}</a>
+      </div>
+    </div>
+  </footer>
+
+  <nav class="mobile-nav" aria-label="Mobile">
+    <a class="{% if request.url.path == '/' %}is-active{% endif %}" href="/"><b>⌂</b><span>{{ t('nav.overview') }}</span></a>
+    <a class="{% if request.url.path.startswith('/media') %}is-active{% endif %}" href="/media"><b>▶</b><span>{{ t('nav.media') }}</span></a>
+    <a class="{% if request.url.path.startswith('/categories') %}is-active{% endif %}" href="/categories"><b>▦</b><span>{{ t('nav.categories') }}</span></a>
+    {% if site.enable_user_uploads %}<a class="{% if request.url.path.startswith('/upload') %}is-active{% endif %}" href="/upload"><b>＋</b><span>{{ t('nav.upload') }}</span></a>{% endif %}
+    <a class="{% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="{% if request.session.get('user_id') %}/admin{% else %}/login{% endif %}"><b>◉</b><span>{% if request.session.get('user_id') %}{{ t('nav.admin') }}{% else %}{{ t('nav.login') }}{% endif %}</span></a>
+  </nav>
+</body>
+</html>

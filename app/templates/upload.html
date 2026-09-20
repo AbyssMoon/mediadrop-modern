@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ t('upload.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section form-page">
+  <div class="page-heading"><div><span class="eyebrow">{{ site.site_name }}</span><h1>{{ t('upload.title') }}</h1><p>{{ t('upload.subtitle') }}</p></div></div>
+  <form class="surface editor-form" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <label>{{ t('upload.media_title') }}<input name="title" required></label>
+    <label>{{ t('upload.description') }}<textarea name="description"></textarea></label>
+    <div class="form-grid"><label>{{ t('upload.name') }}<input name="name"></label><label>{{ t('upload.email') }}<input type="email" name="email"></label></div>
+    <label class="file-field"><span>{{ t('upload.file') }}</span><input type="file" name="file" accept="video/*,audio/*" required></label>
+    <label class="file-field"><span>{{ t('upload.thumbnail') }}</span><input type="file" name="thumbnail" accept="image/jpeg,image/png,image/webp"><small>{{ t('upload.thumbnail_help') }}</small></label>
+    <button>{{ t('upload.button') }}</button>
+  </form>
+</section>
+{% endblock %}

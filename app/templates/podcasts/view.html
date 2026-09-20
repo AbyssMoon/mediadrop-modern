@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_media_card.html" import media_card with context %}
+{% block title %}{{ podcast.title }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section">
+  <div class="podcast-hero">
+    <div class="podcast-art" aria-hidden="true">◉</div>
+    <div><span class="eyebrow">Podcast</span><h1>{{ podcast.title }}</h1>{% if podcast.description %}<p>{{ podcast.description }}</p>{% endif %}<a class="button button--secondary" href="/podcasts/feed/{{ podcast.slug }}.xml">{{ t('podcast.rss') }}</a></div>
+  </div>
+  {% if media %}<div class="media-grid media-grid--catalog">{% for item in media %}{{ media_card(item) }}{% endfor %}</div>
+  {% else %}<div class="empty-state"><h3>{{ t('empty.episodes') }}</h3></div>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,533 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+SUPPORTED_LOCALES = ("ru", "en")
+
+_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "ru": {
+        "nav.media": "Медиа",
+        "nav.tags": "Теги",
+        "nav.upload": "Загрузить",
+        "nav.admin": "Админка",
+        "nav.login": "Войти",
+        "nav.home": "Главная",
+        "hero.eyebrow": "Медиатека",
+        "hero.title": "Видео и аудио в одном месте",
+        "hero.subtitle": "Смотрите, находите и публикуйте готовые медиафайлы без лишней обработки.",
+        "hero.search_placeholder": "Поиск по медиатеке",
+        "hero.search_button": "Найти",
+        "hero.all_media": "Все материалы",
+        "section.latest": "Новое",
+        "section.latest_subtitle": "Последние опубликованные материалы",
+        "section.popular": "Популярное",
+        "section.popular_subtitle": "Материалы, которые смотрят чаще всего",
+        "section.categories": "Категории",
+        "section.comments": "Комментарии",
+        "empty.media": "Пока нет опубликованных материалов.",
+        "empty.search": "По вашему запросу ничего не найдено.",
+        "empty.comments": "Комментариев пока нет.",
+        "empty.tags": "Тегов пока нет.",
+        "empty.episodes": "В этом подкасте пока нет выпусков.",
+        "media.title": "Медиа",
+        "media.search": "Поиск",
+        "media.search_placeholder": "Название или описание",
+        "media.latest": "Сначала новые",
+        "media.popular": "Сначала популярные",
+        "media.previous": "Назад",
+        "media.next": "Дальше",
+        "media.watch": "Смотреть",
+        "media.listen": "Слушать",
+        "media.download": "Скачать файл",
+        "media.no_file": "К материалу не прикреплён готовый для браузера медиафайл.",
+        "media.views": "просмотров",
+        "media.likes": "нравится",
+        "media.dislikes": "не нравится",
+        "media.like": "Нравится",
+        "media.dislike": "Не нравится",
+        "media.about": "О материале",
+        "media.published": "Опубликовано",
+        "media.tags": "Теги",
+        "media.categories": "Категории",
+        "media.random": "Случайное",
+        "comment.name": "Имя",
+        "comment.email": "Email",
+        "comment.body": "Комментарий",
+        "comment.placeholder": "Напишите комментарий",
+        "comment.submit": "Отправить комментарий",
+        "tags.title": "Теги",
+        "podcast.rss": "RSS-лента",
+        "upload.title": "Загрузка",
+        "upload.subtitle": "Загрузите готовый MP4, WebM, MP3 или другой файл, который уже воспроизводится в браузере. Перекодирование не выполняется.",
+        "upload.media_title": "Название",
+        "upload.description": "Описание",
+        "upload.name": "Ваше имя",
+        "upload.email": "Email",
+        "upload.file": "Медиафайл",
+        "upload.thumbnail": "Превью",
+        "upload.thumbnail_help": "Необязательно. JPEG, PNG или WebP; используется в списках и как poster видео.",
+        "upload.button": "Загрузить",
+        "upload.success_title": "Файл загружен",
+        "upload.success_text": "Файл сохранён как готовое медиа. Перед публикацией может потребоваться модерация.",
+        "upload.return_home": "Вернуться на главную",
+        "login.title": "Вход",
+        "login.subtitle": "Войдите в панель управления MediaDrop",
+        "login.username": "Логин или email",
+        "login.password": "Пароль",
+        "login.button": "Войти",
+        "error.invalid_credentials": "Неверный логин или пароль",
+        "admin.dashboard": "Обзор",
+        "admin.media": "Медиа",
+        "admin.comments": "Комментарии",
+        "admin.categories": "Категории",
+        "admin.podcasts": "Подкасты",
+        "admin.users": "Пользователи",
+        "admin.logout": "Выйти",
+        "admin.panel": "Панель управления",
+        "admin.content": "Управление контентом",
+        "admin.pending_media": "На модерации",
+        "admin.pending_comments": "Комментарии на модерации",
+        "admin.total_media": "Всего материалов",
+        "admin.total_comments": "Всего комментариев",
+        "admin.new_media": "Добавить материал",
+        "admin.edit_media": "Редактирование материала",
+        "admin.create_media": "Новый материал",
+        "admin.title": "Название",
+        "admin.slug": "Slug",
+        "admin.description": "Описание",
+        "admin.notes": "Внутренние заметки",
+        "admin.author": "Автор",
+        "admin.author_email": "Email автора",
+        "admin.podcast": "Подкаст",
+        "admin.tags": "Теги",
+        "admin.categories_field": "Категории",
+        "admin.publish_on": "Опубликовать",
+        "admin.publish_until": "Снять с публикации",
+        "admin.reviewed": "Проверено",
+        "admin.publishable": "Разрешена публикация",
+        "admin.ready_file": "Готовый видео/аудиофайл",
+        "admin.no_transcoding": "Файл сохраняется как есть — без перекодирования.",
+        "admin.thumbnail": "Превью",
+        "admin.thumbnail_help": "JPEG, PNG или WebP. Изображение будет обрезано до 16:9 и сохранено в нескольких размерах.",
+        "admin.save": "Сохранить",
+        "admin.files": "Файлы",
+        "admin.no_files": "Файлы не прикреплены.",
+        "admin.delete_media": "Удалить материал",
+        "admin.delete_confirm": "Удалить этот материал?",
+        "admin.search_title": "Поиск по названию",
+        "admin.search": "Найти",
+        "admin.id": "ID",
+        "admin.status": "Статус",
+        "admin.published": "Публикация",
+        "admin.action": "Действие",
+        "admin.ready": "готов",
+        "admin.no_file": "нет файла",
+        "admin.needs_review": "нужна проверка",
+        "admin.edit": "Изменить",
+        "admin.category_name": "Название категории",
+        "admin.no_parent": "Без родительской категории",
+        "admin.add": "Добавить",
+        "admin.delete": "Удалить",
+        "admin.add_podcast": "Добавить подкаст",
+        "admin.podcast_title": "Название",
+        "admin.user_note": "Существующие учётные данные старого MediaDrop читаются без миграции паролей. Обновление схемы паролей можно сделать отдельным этапом.",
+        "admin.username": "Логин",
+        "admin.email": "Email",
+        "admin.name": "Имя",
+        "admin.comment_on": "к материалу",
+        "admin.deleted_media": "удалённый материал",
+        "admin.comment_status": "Статус",
+        "admin.comment_published": "опубликован",
+        "admin.comment_pending": "ожидает / скрыт",
+        "admin.approve": "Одобрить",
+        "footer.runtime": "Современный MediaDrop на Python 3",
+        "footer.api": "API",
+        "common.language": "Язык",
+        "common.ru": "RU",
+        "common.en": "EN",
+        "common.back_home": "На главную",
+    },
+    "en": {
+        "nav.media": "Media",
+        "nav.tags": "Tags",
+        "nav.upload": "Upload",
+        "nav.admin": "Admin",
+        "nav.login": "Log in",
+        "nav.home": "Home",
+        "hero.eyebrow": "Media library",
+        "hero.title": "Video and audio in one place",
+        "hero.subtitle": "Watch, discover and publish browser-ready media without unnecessary processing.",
+        "hero.search_placeholder": "Search the media library",
+        "hero.search_button": "Search",
+        "hero.all_media": "Browse all",
+        "section.latest": "Latest",
+        "section.latest_subtitle": "Recently published media",
+        "section.popular": "Popular",
+        "section.popular_subtitle": "Media people watch most",
+        "section.categories": "Categories",
+        "section.comments": "Comments",
+        "empty.media": "No published media yet.",
+        "empty.search": "Nothing matched your search.",
+        "empty.comments": "No comments yet.",
+        "empty.tags": "No tags yet.",
+        "empty.episodes": "No episodes yet.",
+        "media.title": "Media",
+        "media.search": "Search",
+        "media.search_placeholder": "Title or description",
+        "media.latest": "Newest first",
+        "media.popular": "Most popular",
+        "media.previous": "Previous",
+        "media.next": "Next",
+        "media.watch": "Watch",
+        "media.listen": "Listen",
+        "media.download": "Download file",
+        "media.no_file": "No browser-ready media file is attached.",
+        "media.views": "views",
+        "media.likes": "likes",
+        "media.dislikes": "dislikes",
+        "media.like": "Like",
+        "media.dislike": "Dislike",
+        "media.about": "About",
+        "media.published": "Published",
+        "media.tags": "Tags",
+        "media.categories": "Categories",
+        "media.random": "Random",
+        "comment.name": "Name",
+        "comment.email": "Email",
+        "comment.body": "Comment",
+        "comment.placeholder": "Write a comment",
+        "comment.submit": "Post comment",
+        "tags.title": "Tags",
+        "podcast.rss": "RSS feed",
+        "upload.title": "Upload",
+        "upload.subtitle": "Upload an MP4, WebM, MP3 or another browser-ready file. No transcoding is performed.",
+        "upload.media_title": "Title",
+        "upload.description": "Description",
+        "upload.name": "Your name",
+        "upload.email": "Email",
+        "upload.file": "Media file",
+        "upload.thumbnail": "Preview image",
+        "upload.thumbnail_help": "Optional. JPEG, PNG or WebP; used in listings and as the video poster.",
+        "upload.button": "Upload",
+        "upload.success_title": "Upload received",
+        "upload.success_text": "The file is stored as web-ready media. It may require review before publication.",
+        "upload.return_home": "Return home",
+        "login.title": "Log in",
+        "login.subtitle": "Sign in to the MediaDrop control panel",
+        "login.username": "Username or email",
+        "login.password": "Password",
+        "login.button": "Log in",
+        "error.invalid_credentials": "Invalid username or password",
+        "admin.dashboard": "Overview",
+        "admin.media": "Media",
+        "admin.comments": "Comments",
+        "admin.categories": "Categories",
+        "admin.podcasts": "Podcasts",
+        "admin.users": "Users",
+        "admin.logout": "Log out",
+        "admin.panel": "Control panel",
+        "admin.content": "Content management",
+        "admin.pending_media": "Pending review",
+        "admin.pending_comments": "Pending comments",
+        "admin.total_media": "Total media",
+        "admin.total_comments": "Total comments",
+        "admin.new_media": "Add media",
+        "admin.edit_media": "Edit media",
+        "admin.create_media": "New media",
+        "admin.title": "Title",
+        "admin.slug": "Slug",
+        "admin.description": "Description",
+        "admin.notes": "Internal notes",
+        "admin.author": "Author",
+        "admin.author_email": "Author email",
+        "admin.podcast": "Podcast",
+        "admin.tags": "Tags",
+        "admin.categories_field": "Categories",
+        "admin.publish_on": "Publish on",
+        "admin.publish_until": "Publish until",
+        "admin.reviewed": "Reviewed",
+        "admin.publishable": "Publishable",
+        "admin.ready_file": "Browser-ready video/audio",
+        "admin.no_transcoding": "The file is stored as-is — no transcoding.",
+        "admin.thumbnail": "Preview image",
+        "admin.thumbnail_help": "JPEG, PNG or WebP. The image is cropped to 16:9 and stored in multiple sizes.",
+        "admin.save": "Save",
+        "admin.files": "Files",
+        "admin.no_files": "No files attached.",
+        "admin.delete_media": "Delete media",
+        "admin.delete_confirm": "Delete this media item?",
+        "admin.search_title": "Search title",
+        "admin.search": "Search",
+        "admin.id": "ID",
+        "admin.status": "Status",
+        "admin.published": "Published",
+        "admin.action": "Action",
+        "admin.ready": "ready",
+        "admin.no_file": "no file",
+        "admin.needs_review": "needs review",
+        "admin.edit": "Edit",
+        "admin.category_name": "Category name",
+        "admin.no_parent": "No parent",
+        "admin.add": "Add",
+        "admin.delete": "Delete",
+        "admin.add_podcast": "Add podcast",
+        "admin.podcast_title": "Title",
+        "admin.user_note": "Existing legacy MediaDrop credentials remain readable. Password migration can be handled separately.",
+        "admin.username": "Username",
+        "admin.email": "Email",
+        "admin.name": "Name",
+        "admin.comment_on": "on",
+        "admin.deleted_media": "deleted media",
+        "admin.comment_status": "Status",
+        "admin.comment_published": "published",
+        "admin.comment_pending": "pending / hidden",
+        "admin.approve": "Approve",
+        "footer.runtime": "Modern MediaDrop on Python 3",
+        "footer.api": "API",
+        "common.language": "Language",
+        "common.ru": "RU",
+        "common.en": "EN",
+        "common.back_home": "Home",
+    },
+}
+
+
+
+_TRANSLATIONS["ru"].update({
+    "nav.overview": "Обзор",
+    "nav.categories": "Категории",
+    "nav.podcasts": "Подкасты",
+    "home.featured": "Самое популярное",
+    "home.latest": "Последние",
+    "home.popular": "Популярные",
+    "home.view_more": "Показать ещё",
+    "home.no_featured": "Пока нет материала для главного блока.",
+    "categories.title": "Категории",
+    "categories.subtitle": "Материалы по разделам",
+    "categories.items": "материалов",
+    "categories.no_categories": "Категории пока не созданы.",
+    "admin.settings": "Настройки",
+    "settings.title": "Настройки",
+    "settings.subtitle": "Основные параметры сайта без устаревших настроек плееров и конвертации.",
+    "settings.general": "Основные",
+    "settings.content": "Контент",
+    "settings.features": "Функции",
+    "settings.appearance": "Внешний вид",
+    "settings.site_name": "Название сайта",
+    "settings.default_language": "Язык по умолчанию",
+    "settings.featured_category": "Категория для главного материала",
+    "settings.no_featured_category": "Автоматически — самый популярный материал",
+    "settings.comments": "Комментарии",
+    "settings.comments_help": "Показывать встроенные комментарии под материалами.",
+    "settings.moderate_comments": "Модерация новых комментариев",
+    "settings.user_uploads": "Пользовательские загрузки",
+    "settings.user_uploads_help": "Разрешить публичную форму загрузки готовых медиафайлов.",
+    "settings.podcasts": "Раздел подкастов",
+    "settings.download": "Кнопка скачивания",
+    "settings.likes": "Кнопка «Нравится»",
+    "settings.dislikes": "Кнопка «Не нравится»",
+    "settings.rss": "RSS-ленты",
+    "settings.sitemap": "Sitemap XML",
+    "settings.max_upload_mb": "Максимальный размер загрузки, МБ",
+    "settings.accent_color": "Акцентный цвет",
+    "settings.footer_text": "Текст в подвале",
+    "settings.save": "Сохранить настройки",
+    "settings.saved": "Настройки сохранены.",
+    "media.comments_disabled": "Комментарии отключены.",
+    "common.yes": "Да",
+    "common.no": "Нет",
+})
+
+_TRANSLATIONS["en"].update({
+    "nav.overview": "Overview",
+    "nav.categories": "Categories",
+    "nav.podcasts": "Podcasts",
+    "home.featured": "Most popular",
+    "home.latest": "Latest",
+    "home.popular": "Popular",
+    "home.view_more": "View more",
+    "home.no_featured": "There is no media for the featured block yet.",
+    "categories.title": "Categories",
+    "categories.subtitle": "Browse media by section",
+    "categories.items": "items",
+    "categories.no_categories": "No categories have been created yet.",
+    "admin.settings": "Settings",
+    "settings.title": "Settings",
+    "settings.subtitle": "Essential site options without legacy player and transcoding settings.",
+    "settings.general": "General",
+    "settings.content": "Content",
+    "settings.features": "Features",
+    "settings.appearance": "Appearance",
+    "settings.site_name": "Site name",
+    "settings.default_language": "Default language",
+    "settings.featured_category": "Featured category",
+    "settings.no_featured_category": "Automatic — most popular media",
+    "settings.comments": "Comments",
+    "settings.comments_help": "Show built-in comments under media.",
+    "settings.moderate_comments": "Moderate new comments",
+    "settings.user_uploads": "User uploads",
+    "settings.user_uploads_help": "Allow the public upload form for browser-ready media.",
+    "settings.podcasts": "Podcasts section",
+    "settings.download": "Download button",
+    "settings.likes": "Like button",
+    "settings.dislikes": "Dislike button",
+    "settings.rss": "RSS feeds",
+    "settings.sitemap": "Sitemap XML",
+    "settings.max_upload_mb": "Maximum upload size, MB",
+    "settings.accent_color": "Accent color",
+    "settings.footer_text": "Footer text",
+    "settings.save": "Save settings",
+    "settings.saved": "Settings saved.",
+    "media.comments_disabled": "Comments are disabled.",
+    "common.yes": "Yes",
+    "common.no": "No",
+})
+
+_TRANSLATIONS["ru"].update({
+    "podcasts.title": "Подкасты",
+    "podcasts.subtitle": "Серии аудио- и видеоматериалов",
+    "podcasts.episodes": "выпусков",
+    "podcasts.empty": "Подкасты пока не созданы.",
+})
+
+_TRANSLATIONS["en"].update({
+    "podcasts.title": "Podcasts",
+    "podcasts.subtitle": "Audio and video series",
+    "podcasts.episodes": "episodes",
+    "podcasts.empty": "No podcasts have been created yet.",
+})
+
+# MediaDrop historically shipped gettext catalogs for these locales. Russian and
+# English are complete in this port; the other catalogs currently translate the
+# common navigation/shell and fall back to English for strings not yet migrated.
+LOCALES: dict[str, dict[str, str]] = {
+    "ru": {"name": "Русский", "dir": "ltr"},
+    "en": {"name": "English", "dir": "ltr"},
+    "ar": {"name": "العربية", "dir": "rtl"},
+    "bg": {"name": "Български", "dir": "ltr"},
+    "cs": {"name": "Čeština", "dir": "ltr"},
+    "de": {"name": "Deutsch", "dir": "ltr"},
+    "el": {"name": "Ελληνικά", "dir": "ltr"},
+    "es": {"name": "Español", "dir": "ltr"},
+    "fi": {"name": "Suomi", "dir": "ltr"},
+    "fr": {"name": "Français", "dir": "ltr"},
+    "he": {"name": "עברית", "dir": "rtl"},
+    "hu": {"name": "Magyar", "dir": "ltr"},
+    "it": {"name": "Italiano", "dir": "ltr"},
+    "ja": {"name": "日本語", "dir": "ltr"},
+    "pl": {"name": "Polski", "dir": "ltr"},
+    "pt_BR": {"name": "Português (Brasil)", "dir": "ltr"},
+    "ro": {"name": "Română", "dir": "ltr"},
+    "sk": {"name": "Slovenčina", "dir": "ltr"},
+    "sl": {"name": "Slovenščina", "dir": "ltr"},
+    "sv": {"name": "Svenska", "dir": "ltr"},
+    "tr": {"name": "Türkçe", "dir": "ltr"},
+    "uk": {"name": "Українська", "dir": "ltr"},
+    "zh_CN": {"name": "简体中文", "dir": "ltr"},
+}
+SUPPORTED_LOCALES = tuple(LOCALES)
+
+_EXTRA_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "de": {"nav.overview":"Übersicht","nav.media":"Mediathek","nav.categories":"Kategorien","nav.tags":"Tags","nav.admin":"Admin","nav.login":"Anmelden","section.latest":"Neueste","section.popular":"Beliebt","home.featured":"Am beliebtesten","home.view_more":"Mehr anzeigen","media.search":"Suche","categories.title":"Kategorien","admin.settings":"Einstellungen","settings.title":"Einstellungen","settings.save":"Einstellungen speichern","common.language":"Sprache"},
+    "es": {"nav.overview":"Resumen","nav.media":"Biblioteca","nav.categories":"Categorías","nav.tags":"Etiquetas","nav.admin":"Admin","nav.login":"Entrar","section.latest":"Últimos","section.popular":"Populares","home.featured":"Más popular","home.view_more":"Ver más","media.search":"Buscar","categories.title":"Categorías","admin.settings":"Ajustes","settings.title":"Ajustes","settings.save":"Guardar ajustes","common.language":"Idioma"},
+    "fr": {"nav.overview":"Aperçu","nav.media":"Médiathèque","nav.categories":"Catégories","nav.tags":"Tags","nav.admin":"Admin","nav.login":"Connexion","section.latest":"Derniers","section.popular":"Populaires","home.featured":"Le plus populaire","home.view_more":"Voir plus","media.search":"Recherche","categories.title":"Catégories","admin.settings":"Paramètres","settings.title":"Paramètres","settings.save":"Enregistrer","common.language":"Langue"},
+    "it": {"nav.overview":"Panoramica","nav.media":"Libreria","nav.categories":"Categorie","nav.tags":"Tag","nav.admin":"Admin","nav.login":"Accedi","section.latest":"Ultimi","section.popular":"Popolari","home.featured":"Più popolare","home.view_more":"Mostra altro","media.search":"Cerca","categories.title":"Categorie","admin.settings":"Impostazioni","settings.title":"Impostazioni","settings.save":"Salva impostazioni","common.language":"Lingua"},
+    "pt_BR": {"nav.overview":"Visão geral","nav.media":"Biblioteca","nav.categories":"Categorias","nav.tags":"Tags","nav.admin":"Admin","nav.login":"Entrar","section.latest":"Recentes","section.popular":"Populares","home.featured":"Mais popular","home.view_more":"Ver mais","media.search":"Buscar","categories.title":"Categorias","admin.settings":"Configurações","settings.title":"Configurações","settings.save":"Salvar configurações","common.language":"Idioma"},
+    "pl": {"nav.overview":"Przegląd","nav.media":"Biblioteka","nav.categories":"Kategorie","nav.tags":"Tagi","nav.admin":"Admin","nav.login":"Zaloguj","section.latest":"Najnowsze","section.popular":"Popularne","home.featured":"Najpopularniejsze","home.view_more":"Pokaż więcej","media.search":"Szukaj","categories.title":"Kategorie","admin.settings":"Ustawienia","settings.title":"Ustawienia","settings.save":"Zapisz ustawienia","common.language":"Język"},
+    "cs": {"nav.overview":"Přehled","nav.media":"Knihovna","nav.categories":"Kategorie","nav.tags":"Štítky","nav.admin":"Admin","nav.login":"Přihlásit","section.latest":"Nejnovější","section.popular":"Populární","home.featured":"Nejpopulárnější","home.view_more":"Zobrazit více","media.search":"Hledat","categories.title":"Kategorie","admin.settings":"Nastavení","settings.title":"Nastavení","settings.save":"Uložit nastavení","common.language":"Jazyk"},
+    "sv": {"nav.overview":"Översikt","nav.media":"Bibliotek","nav.categories":"Kategorier","nav.tags":"Taggar","nav.admin":"Admin","nav.login":"Logga in","section.latest":"Senaste","section.popular":"Populärt","home.featured":"Mest populärt","home.view_more":"Visa mer","media.search":"Sök","categories.title":"Kategorier","admin.settings":"Inställningar","settings.title":"Inställningar","settings.save":"Spara inställningar","common.language":"Språk"},
+    "fi": {"nav.overview":"Yleiskatsaus","nav.media":"Kirjasto","nav.categories":"Kategoriat","nav.tags":"Tunnisteet","nav.admin":"Ylläpito","nav.login":"Kirjaudu","section.latest":"Uusimmat","section.popular":"Suositut","home.featured":"Suosituin","home.view_more":"Näytä lisää","media.search":"Haku","categories.title":"Kategoriat","admin.settings":"Asetukset","settings.title":"Asetukset","settings.save":"Tallenna asetukset","common.language":"Kieli"},
+    "tr": {"nav.overview":"Genel bakış","nav.media":"Kütüphane","nav.categories":"Kategoriler","nav.tags":"Etiketler","nav.admin":"Yönetim","nav.login":"Giriş","section.latest":"En yeniler","section.popular":"Popüler","home.featured":"En popüler","home.view_more":"Daha fazla","media.search":"Ara","categories.title":"Kategoriler","admin.settings":"Ayarlar","settings.title":"Ayarlar","settings.save":"Ayarları kaydet","common.language":"Dil"},
+    "uk": {"nav.overview":"Огляд","nav.media":"Медіатека","nav.categories":"Категорії","nav.tags":"Теги","nav.admin":"Адмін","nav.login":"Увійти","section.latest":"Останні","section.popular":"Популярні","home.featured":"Найпопулярніше","home.view_more":"Показати більше","media.search":"Пошук","categories.title":"Категорії","admin.settings":"Налаштування","settings.title":"Налаштування","settings.save":"Зберегти налаштування","common.language":"Мова"},
+    "bg": {"nav.overview":"Преглед","nav.media":"Медиатека","nav.categories":"Категории","nav.tags":"Етикети","nav.admin":"Админ","nav.login":"Вход","section.latest":"Последни","section.popular":"Популярни","home.featured":"Най-популярно","home.view_more":"Още","media.search":"Търсене","categories.title":"Категории","admin.settings":"Настройки","settings.title":"Настройки","settings.save":"Запази","common.language":"Език"},
+    "el": {"nav.overview":"Επισκόπηση","nav.media":"Βιβλιοθήκη","nav.categories":"Κατηγορίες","nav.tags":"Ετικέτες","nav.admin":"Διαχείριση","nav.login":"Σύνδεση","section.latest":"Πρόσφατα","section.popular":"Δημοφιλή","home.featured":"Δημοφιλέστερο","home.view_more":"Περισσότερα","media.search":"Αναζήτηση","categories.title":"Κατηγορίες","admin.settings":"Ρυθμίσεις","settings.title":"Ρυθμίσεις","settings.save":"Αποθήκευση","common.language":"Γλώσσα"},
+    "he": {"nav.overview":"סקירה","nav.media":"ספרייה","nav.categories":"קטגוריות","nav.tags":"תגיות","nav.admin":"ניהול","nav.login":"כניסה","section.latest":"אחרונים","section.popular":"פופולריים","home.featured":"הכי פופולרי","home.view_more":"הצג עוד","media.search":"חיפוש","categories.title":"קטגוריות","admin.settings":"הגדרות","settings.title":"הגדרות","settings.save":"שמור הגדרות","common.language":"שפה"},
+    "ar": {"nav.overview":"نظرة عامة","nav.media":"المكتبة","nav.categories":"التصنيفات","nav.tags":"الوسوم","nav.admin":"الإدارة","nav.login":"تسجيل الدخول","section.latest":"الأحدث","section.popular":"الأكثر شعبية","home.featured":"الأكثر شعبية","home.view_more":"عرض المزيد","media.search":"بحث","categories.title":"التصنيفات","admin.settings":"الإعدادات","settings.title":"الإعدادات","settings.save":"حفظ الإعدادات","common.language":"اللغة"},
+    "hu": {"nav.overview":"Áttekintés","nav.media":"Médiatár","nav.categories":"Kategóriák","nav.tags":"Címkék","nav.admin":"Admin","nav.login":"Belépés","section.latest":"Legújabb","section.popular":"Népszerű","home.featured":"Legnépszerűbb","home.view_more":"Több","media.search":"Keresés","categories.title":"Kategóriák","admin.settings":"Beállítások","settings.title":"Beállítások","settings.save":"Mentés","common.language":"Nyelv"},
+    "ja": {"nav.overview":"概要","nav.media":"メディア","nav.categories":"カテゴリー","nav.tags":"タグ","nav.admin":"管理","nav.login":"ログイン","section.latest":"最新","section.popular":"人気","home.featured":"最も人気","home.view_more":"もっと見る","media.search":"検索","categories.title":"カテゴリー","admin.settings":"設定","settings.title":"設定","settings.save":"設定を保存","common.language":"言語"},
+    "ro": {"nav.overview":"Prezentare","nav.media":"Bibliotecă","nav.categories":"Categorii","nav.tags":"Etichete","nav.admin":"Admin","nav.login":"Autentificare","section.latest":"Recente","section.popular":"Populare","home.featured":"Cel mai popular","home.view_more":"Vezi mai mult","media.search":"Căutare","categories.title":"Categorii","admin.settings":"Setări","settings.title":"Setări","settings.save":"Salvează setările","common.language":"Limbă"},
+    "sk": {"nav.overview":"Prehľad","nav.media":"Knižnica","nav.categories":"Kategórie","nav.tags":"Značky","nav.admin":"Admin","nav.login":"Prihlásiť","section.latest":"Najnovšie","section.popular":"Populárne","home.featured":"Najpopulárnejšie","home.view_more":"Zobraziť viac","media.search":"Hľadať","categories.title":"Kategórie","admin.settings":"Nastavenia","settings.title":"Nastavenia","settings.save":"Uložiť nastavenia","common.language":"Jazyk"},
+    "sl": {"nav.overview":"Pregled","nav.media":"Knjižnica","nav.categories":"Kategorije","nav.tags":"Oznake","nav.admin":"Admin","nav.login":"Prijava","section.latest":"Najnovejše","section.popular":"Priljubljeno","home.featured":"Najbolj priljubljeno","home.view_more":"Prikaži več","media.search":"Iskanje","categories.title":"Kategorije","admin.settings":"Nastavitve","settings.title":"Nastavitve","settings.save":"Shrani nastavitve","common.language":"Jezik"},
+    "zh_CN": {"nav.overview":"概览","nav.media":"媒体库","nav.categories":"分类","nav.tags":"标签","nav.admin":"管理","nav.login":"登录","section.latest":"最新","section.popular":"热门","home.featured":"最热门","home.view_more":"查看更多","media.search":"搜索","categories.title":"分类","admin.settings":"设置","settings.title":"设置","settings.save":"保存设置","common.language":"语言"},
+}
+
+
+def normalize_locale(value: str | None, fallback: str = "ru") -> str:
+    fallback = fallback if fallback in LOCALES else "ru"
+    if not value:
+        return fallback
+    normalized = value.strip().replace("-", "_")
+    for code in SUPPORTED_LOCALES:
+        if code.lower() == normalized.lower():
+            return code
+    base = normalized.split("_", 1)[0].lower()
+    for code in SUPPORTED_LOCALES:
+        if code.split("_", 1)[0].lower() == base:
+            return code
+    return fallback
+
+
+def locale_name(locale: str) -> str:
+    code = normalize_locale(locale)
+    return LOCALES[code]["name"]
+
+
+def locale_dir(locale: str) -> str:
+    code = normalize_locale(locale)
+    return LOCALES[code].get("dir", "ltr")
+
+
+def translate(locale: str, key: str, **values: Any) -> str:
+    locale = normalize_locale(locale)
+    text = _TRANSLATIONS.get(locale, {}).get(key)
+    if text is None:
+        text = _EXTRA_TRANSLATIONS.get(locale, {}).get(key)
+    if text is None:
+        text = _TRANSLATIONS["en"].get(key, key)
+    try:
+        return text.format(**values)
+    except (KeyError, ValueError):
+        return text
+
+
+def format_date(value: datetime | None, locale: str, include_time: bool = False) -> str:
+    if value is None:
+        return ""
+    locale = normalize_locale(locale)
+    if locale == "ru":
+        months = (
+            "января", "февраля", "марта", "апреля", "мая", "июня",
+            "июля", "августа", "сентября", "октября", "ноября", "декабря",
+        )
+        result = f"{value.day} {months[value.month - 1]} {value.year}"
+        if include_time:
+            result += f" · {value:%H:%M}"
+        return result
+    # Keep non-Russian formatting deliberately neutral until all historical
+    # gettext date formats are migrated.
+    return value.strftime("%Y-%m-%d %H:%M" if include_time else "%Y-%m-%d")
+
+
+def views_text(count: int | None, locale: str) -> str:
+    number = int(count or 0)
+    locale = normalize_locale(locale)
+    if locale == "ru":
+        n10 = number % 10
+        n100 = number % 100
+        if n10 == 1 and n100 != 11:
+            word = "просмотр"
+        elif n10 in {2, 3, 4} and n100 not in {12, 13, 14}:
+            word = "просмотра"
+        else:
+            word = "просмотров"
+        return f"{number} {word}"
+    if locale == "uk":
+        return f"{number} переглядів"
+    if locale == "de":
+        return f"{number} Aufrufe"
+    if locale == "es":
+        return f"{number} visualizaciones"
+    if locale == "fr":
+        return f"{number} vues"
+    return f"{number} view" if number == 1 else f"{number} views"

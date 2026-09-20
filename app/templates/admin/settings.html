@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ t('settings.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="admin-page container-wide">
+  {% include "admin/_nav.html" %}
+  <div class="page-heading settings-heading">
+    <div><span class="eyebrow">{{ t('admin.panel') }}</span><h2>{{ t('settings.title') }}</h2><p>{{ t('settings.subtitle') }}</p></div>
+  </div>
+  {% if saved %}<div class="notice notice--success">✓ {{ t('settings.saved') }}</div>{% endif %}
+
+  <form class="settings-form" method="post" action="/admin/settings">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>01</span><div><h3>{{ t('settings.general') }}</h3></div></div>
+      <div class="settings-fields">
+        <label>{{ t('settings.site_name') }}<input name="site_name" maxlength="255" required value="{{ site_values.site_name }}"></label>
+        <label>{{ t('settings.default_language') }}
+          <select name="primary_language">
+            {% for code, meta in language_options.items() %}<option value="{{ code }}" {% if site_values.primary_language == code %}selected{% endif %}>{{ meta.name }} [{{ code }}]</option>{% endfor %}
+          </select>
+        </label>
+        <label class="wide">{{ t('settings.featured_category') }}
+          <select name="featured_category">
+            <option value="">{{ t('settings.no_featured_category') }}</option>
+            {% for category in categories %}<option value="{{ category.id }}" {% if site_values.featured_category == category.id %}selected{% endif %}>{{ category.name }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>02</span><div><h3>{{ t('settings.content') }}</h3></div></div>
+      <div class="settings-toggle-grid">
+        <label class="settings-toggle"><input type="checkbox" name="comments_enabled" {% if site_values.comments_enabled %}checked{% endif %}><span></span><div><b>{{ t('settings.comments') }}</b><small>{{ t('settings.comments_help') }}</small></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="require_comment_approval" {% if site_values.require_comment_approval %}checked{% endif %}><span></span><div><b>{{ t('settings.moderate_comments') }}</b></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="enable_user_uploads" {% if site_values.enable_user_uploads %}checked{% endif %}><span></span><div><b>{{ t('settings.user_uploads') }}</b><small>{{ t('settings.user_uploads_help') }}</small></div></label>
+        <label class="settings-upload-limit">{{ t('settings.max_upload_mb') }}<input type="number" name="max_upload_mb" min="1" max="1048576" value="{{ site_values.max_upload_mb }}"></label>
+      </div>
+    </section>
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>03</span><div><h3>{{ t('settings.features') }}</h3></div></div>
+      <div class="settings-toggle-grid">
+        <label class="settings-toggle"><input type="checkbox" name="enable_podcasts" {% if site_values.enable_podcasts %}checked{% endif %}><span></span><div><b>{{ t('settings.podcasts') }}</b></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="show_download" {% if site_values.show_download %}checked{% endif %}><span></span><div><b>{{ t('settings.download') }}</b></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="show_like" {% if site_values.show_like %}checked{% endif %}><span></span><div><b>{{ t('settings.likes') }}</b></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="show_dislike" {% if site_values.show_dislike %}checked{% endif %}><span></span><div><b>{{ t('settings.dislikes') }}</b></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="rss_enabled" {% if site_values.rss_enabled %}checked{% endif %}><span></span><div><b>{{ t('settings.rss') }}</b></div></label>
+        <label class="settings-toggle"><input type="checkbox" name="sitemap_enabled" {% if site_values.sitemap_enabled %}checked{% endif %}><span></span><div><b>{{ t('settings.sitemap') }}</b></div></label>
+      </div>
+    </section>
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>04</span><div><h3>{{ t('settings.appearance') }}</h3></div></div>
+      <div class="settings-fields">
+        <label>{{ t('settings.accent_color') }}<div class="color-input"><input type="color" name="accent_color" value="{{ site_values.accent_color }}"><code>{{ site_values.accent_color }}</code></div></label>
+        <label>{{ t('settings.footer_text') }}<input name="footer_text" maxlength="500" value="{{ site_values.footer_text }}"></label>
+      </div>
+    </section>
+
+    <div class="settings-actions"><button class="button button--primary" type="submit">{{ t('settings.save') }}</button></div>
+  </form>
+</section>
+{% endblock %}

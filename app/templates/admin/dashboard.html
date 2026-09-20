@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}{{ t('admin.panel') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="admin-page container-wide">{% include "admin/_nav.html" %}
+  <div class="section-heading section-heading--compact"><div><span class="eyebrow">{{ t('admin.content') }}</span><h2>{{ t('admin.dashboard') }}</h2></div><a class="button" href="/admin/media/new">+ {{ t('admin.new_media') }}</a></div>
+  <div class="stats-grid">
+    <div class="stat-card"><span class="stat-card__icon">▶</span><div><strong>{{ counts.media }}</strong><span>{{ t('admin.total_media') }}</span></div></div>
+    <div class="stat-card"><span class="stat-card__icon">◷</span><div><strong>{{ counts.pending_media }}</strong><span>{{ t('admin.pending_media') }}</span></div></div>
+    <div class="stat-card"><span class="stat-card__icon">☵</span><div><strong>{{ counts.comments }}</strong><span>{{ t('admin.total_comments') }}</span></div></div>
+    <div class="stat-card"><span class="stat-card__icon">◎</span><div><strong>{{ counts.pending_comments }}</strong><span>{{ t('admin.pending_comments') }}</span></div></div>
+  </div>
+</section>
+{% endblock %}

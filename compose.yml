@@ -1,0 +1,56 @@
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-mediadrop}
+      MARIADB_USER: ${DB_USER:-mediadrop}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mediadrop_db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${APP_NAME:-MediaDrop}
+      LOCALE: ${LOCALE:-ru}
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      DATABASE_URL: mysql+pymysql://${DB_USER:-mediadrop}:${DB_PASSWORD}@db:3306/${DB_NAME:-mediadrop}?charset=utf8mb4
+      MEDIA_ROOT: /data/media
+      IMAGE_ROOT: /data/images
+      LEGACY_MEDIA_ROOT: /data/legacy-media
+      LEGACY_IMAGE_ROOT: /data/legacy-images
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      PUBLIC_UPLOADS: ${PUBLIC_UPLOADS:-false}
+      UPLOADS_REQUIRE_REVIEW: ${UPLOADS_REQUIRE_REVIEW:-true}
+      MEDIA_SERVE_MODE: ${MEDIA_SERVE_MODE:-app}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-2047}
+      MAX_THUMBNAIL_MB: ${MAX_THUMBNAIL_MB:-20}
+    ports:
+      - "${BIND_ADDR:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
+    volumes:
+      # Writable volumes for all new uploads made by the modern application.
+      - mediadrop_media:/data/media
+      - mediadrop_images:/data/images
+      # Legacy archive remains read-only; the app falls back to it automatically.
+      - ${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/media:/data/legacy-media:ro
+      - ${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/images:/data/legacy-images:ro
+
+volumes:
+  mediadrop_db:
+  mediadrop_media:
+  mediadrop_images:

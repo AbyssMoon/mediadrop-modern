@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{% if media %}{{ t('admin.edit_media') }}{% else %}{{ t('admin.create_media') }}{% endif %} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="admin-page container-wide">{% include "admin/_nav.html" %}
+  <div class="section-heading section-heading--compact"><div><h2>{% if media %}{{ t('admin.edit_media') }}{% else %}{{ t('admin.create_media') }}{% endif %}</h2>{% if media %}<p class="muted">#{{ media.id }} · /{{ media.slug }}</p>{% endif %}</div></div>
+  <form class="surface editor-form" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <div class="form-grid">
+      <label>{{ t('admin.title') }}<input name="title" required maxlength="255" value="{{ media.title if media else '' }}"></label>
+      <label>{{ t('admin.slug') }}<input name="slug" maxlength="50" value="{{ media.slug if media else '' }}"></label>
+      <label class="wide">{{ t('admin.description') }}<textarea name="description">{{ media.description if media else '' }}</textarea></label>
+      <label class="wide">{{ t('admin.notes') }}<textarea name="notes">{{ media.notes if media else '' }}</textarea></label>
+      <label>{{ t('admin.author') }}<input name="author_name" maxlength="50" value="{{ media.author_name if media else '' }}"></label>
+      <label>{{ t('admin.author_email') }}<input name="author_email" type="email" value="{{ media.author_email if media else '' }}"></label>
+      <label>{{ t('admin.podcast') }}<select name="podcast_id"><option value="">—</option>{% for p in podcasts %}<option value="{{ p.id }}" {% if media and media.podcast_id == p.id %}selected{% endif %}>{{ p.title }}</option>{% endfor %}</select></label>
+      <label>{{ t('admin.tags') }}<input name="tags" value="{% if media %}{{ media.tags|map(attribute='name')|join(', ') }}{% endif %}"></label>
+      <fieldset class="wide"><legend>{{ t('admin.categories_field') }}</legend><div class="checkbox-grid">{% for c in categories %}<label class="check"><input type="checkbox" name="category_ids" value="{{ c.id }}" {% if media and c in media.categories %}checked{% endif %}><span>{{ c.name }}</span></label>{% endfor %}</div></fieldset>
+      <label>{{ t('admin.publish_on') }}<input type="datetime-local" name="publish_on" value="{% if media and media.publish_on %}{{ media.publish_on.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"></label>
+      {% if media %}<label>{{ t('admin.publish_until') }}<input type="datetime-local" name="publish_until" value="{% if media.publish_until %}{{ media.publish_until.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"></label>{% endif %}
+      <div class="wide switch-row"><label class="switch"><input type="checkbox" name="reviewed" {% if not media or media.reviewed %}checked{% endif %}><span></span><b>{{ t('admin.reviewed') }}</b></label><label class="switch"><input type="checkbox" name="publishable" {% if not media or media.publishable %}checked{% endif %}><span></span><b>{{ t('admin.publishable') }}</b></label></div>
+      <label class="wide file-field"><span>{{ t('admin.ready_file') }}</span><input type="file" name="file" accept="video/*,audio/*"><small>{{ t('admin.no_transcoding') }}</small></label>
+      <label class="wide file-field"><span>{{ t('admin.thumbnail') }}</span>{% if media and thumbnail_url(media, 'm') %}<img class="admin-thumbnail-preview" src="{{ thumbnail_url(media, 'm') }}" alt="">{% endif %}<input type="file" name="thumbnail" accept="image/jpeg,image/png,image/webp"><small>{{ t('admin.thumbnail_help') }}</small></label>
+    </div>
+    <div class="form-actions"><button>{{ t('admin.save') }}</button>{% if media %}<a class="button button--ghost" href="{{ media_url(media) }}" target="_blank">{{ t('media.watch') }} ↗</a>{% endif %}</div>
+  </form>
+  {% if media %}
+  <div class="surface secondary-panel"><h3>{{ t('admin.files') }}</h3><ul class="file-list">{% for f in media.files %}<li><span class="file-icon">▰</span><div><strong>{{ f.display_name }}</strong><span>{{ f.type }}/{{ f.container }}</span></div></li>{% else %}<li>{{ t('admin.no_files') }}</li>{% endfor %}</ul></div>
+  <form class="danger-zone" method="post" action="/admin/media/{{ media.id }}/delete" onsubmit="return confirm('{{ t('admin.delete_confirm') }}')"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button--danger">{{ t('admin.delete_media') }}</button></form>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mediadrop-modern"
+version = "0.4.0"
+description = "A modern Python 3 replacement backend for the legacy MediaDrop schema"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "GPL-3.0-or-later"}
+dependencies = [
+  "fastapi>=0.141,<0.142",
+  "uvicorn>=0.53,<0.54",
+  "SQLAlchemy>=2.0.54,<2.1",
+  "Jinja2>=3.1,<4",
+  "itsdangerous>=2.2,<3",
+  "pydantic-settings>=2.10,<3",
+  "python-multipart>=0.0.20,<1",
+  "PyMySQL>=1.1,<2",
+  "bleach>=6.2,<7",
+  "Unidecode>=1.4,<2",
+  "Pillow>=12,<13",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=9,<10",
+  "httpx>=0.28,<0.29",
+  "ruff>=0.13,<0.14",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[project.scripts]
+mediadrop = "app.cli:main"
+
+[tool.setuptools.package-data]
+app = ["templates/**/*.html", "static/*"]

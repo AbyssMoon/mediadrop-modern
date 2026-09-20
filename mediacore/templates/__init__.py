@@ -1,1 +1,0 @@
-from mediadrop.templates import *

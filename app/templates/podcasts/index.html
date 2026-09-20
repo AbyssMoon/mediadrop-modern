@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ t('podcasts.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section podcasts-page">
+  <div class="page-heading page-heading--split">
+    <div><span class="eyebrow">{{ site.site_name }}</span><h1>{{ t('podcasts.title') }}</h1><p>{{ t('podcasts.subtitle') }}</p></div>
+  </div>
+  {% if podcasts %}
+    <div class="podcast-grid">
+      {% for podcast in podcasts %}
+        <article class="podcast-card surface">
+          <a class="podcast-card__art" href="/podcasts/{{ podcast.slug }}"><span>◉</span></a>
+          <div class="podcast-card__body">
+            <h2><a href="/podcasts/{{ podcast.slug }}">{{ podcast.title }}</a></h2>
+            {% if podcast.subtitle %}<p>{{ podcast.subtitle }}</p>{% elif podcast.description %}<p>{{ podcast.description|striptags|truncate(140, true, '…') }}</p>{% endif %}
+            <div class="podcast-card__meta"><span>{{ counts.get(podcast.id, 0) }} {{ t('podcasts.episodes') }}</span><a href="/podcasts/feed/{{ podcast.slug }}.xml">RSS</a></div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><span class="empty-state__icon">◉</span><h3>{{ t('podcasts.empty') }}</h3></div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ t('categories.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section categories-page">
+  <div class="page-heading page-heading--split">
+    <div><span class="eyebrow">{{ t('categories.subtitle') }}</span><h1>{{ t('categories.title') }}</h1></div>
+    <a class="button button--secondary" href="/media">{{ t('hero.all_media') }}</a>
+  </div>
+  {% if categories %}
+    <div class="category-grid">
+      {% for category in categories %}
+        <article class="category-card surface">
+          <a class="category-card__main" href="/categories/{{ category.slug }}">
+            <span class="category-card__icon">▦</span>
+            <div><h2>{{ category.name }}</h2><p>{{ counts.get(category.id, 0) }} {{ t('categories.items') }}</p></div>
+            <span class="category-card__arrow">→</span>
+          </a>
+          {% if category.children %}
+            <div class="category-card__children">
+              {% for child in category.children %}<a href="/categories/{{ child.slug }}">{{ child.name }} <span>{{ counts.get(child.id, 0) }}</span></a>{% endfor %}
+            </div>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><span class="empty-state__icon">▦</span><h3>{{ t('categories.no_categories') }}</h3></div>
+  {% endif %}
+</section>
+{% endblock %}

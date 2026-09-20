@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ t('login.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="auth-page container-wide">
+  <div class="auth-card">
+    <div class="auth-card__brand"><span class="brand__mark brand__mark--large" aria-hidden="true"><span></span></span></div>
+    <span class="eyebrow">{{ site.site_name }}</span>
+    <h1>{{ t('login.title') }}</h1>
+    <p>{{ t('login.subtitle') }}</p>
+    {% if error %}<div class="alert alert--error">{{ t(error) }}</div>{% endif %}
+    <form class="stack-form" method="post" action="/login">
+      <input type="hidden" name="csrf" value="{{ csrf_token }}">
+      <label>{{ t('login.username') }}<input name="username" required autofocus autocomplete="username"></label>
+      <label>{{ t('login.password') }}<input type="password" name="password" required autocomplete="current-password"></label>
+      <button class="button--wide">{{ t('login.button') }}</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

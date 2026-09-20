@@ -1,0 +1,13 @@
+<div class="admin-header">
+  <div><span class="eyebrow">{{ site.site_name }}</span><h1>{{ t('admin.panel') }}</h1></div>
+  <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button--ghost">{{ t('admin.logout') }}</button></form>
+</div>
+<nav class="admin-nav" aria-label="Admin">
+  <a class="{% if request.url.path in ['/admin','/admin/'] %}is-active{% endif %}" href="/admin">{{ t('admin.dashboard') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/media') %}is-active{% endif %}" href="/admin/media">{{ t('admin.media') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/comments') %}is-active{% endif %}" href="/admin/comments">{{ t('admin.comments') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/categories') %}is-active{% endif %}" href="/admin/categories">{{ t('admin.categories') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/podcasts') %}is-active{% endif %}" href="/admin/podcasts">{{ t('admin.podcasts') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/users') %}is-active{% endif %}" href="/admin/users">{{ t('admin.users') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/settings') %}is-active{% endif %}" href="/admin/settings">{{ t('admin.settings') }}</a>
+</nav>

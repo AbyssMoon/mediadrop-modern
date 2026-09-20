@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ t('tags.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section narrow-page">
+  <div class="page-heading"><div><span class="eyebrow">{{ site.site_name }}</span><h1>{{ t('tags.title') }}</h1></div></div>
+  {% if tags %}<div class="tag-cloud">{% for tag in tags %}<a class="tag-chip" href="/tags/{{ tag.slug }}"># {{ tag.name }}</a>{% endfor %}</div>
+  {% else %}<div class="empty-state"><span class="empty-state__icon">#</span><h3>{{ t('empty.tags') }}</h3></div>{% endif %}
+</section>
+{% endblock %}

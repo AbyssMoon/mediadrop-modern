@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{{ media.title }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="watch-page container-wide">
+  <div class="watch-breadcrumb"><a href="/media">{{ t('media.title') }}</a><span>/</span><span>{{ media.title }}</span></div>
+  <div class="watch-layout">
+    <div class="watch-main">
+      <div class="player-shell">
+        {% set poster = thumbnail_url(media, 'l') %}
+        {% if playable %}
+          {% if playable.type == 'audio' %}<div class="audio-art"><span>♪</span></div><audio controls preload="metadata" src="{{ file_url(playable, media.slug) }}"></audio>
+          {% else %}<video controls preload="metadata" playsinline {% if poster %}poster="{{ poster }}"{% endif %} src="{{ file_url(playable, media.slug) }}"></video>{% endif %}
+        {% else %}<div class="player-empty"><span>▶</span><p>{{ t('media.no_file') }}</p></div>{% endif %}
+      </div>
+      <div class="watch-title-row">
+        <div><h1>{{ media.title }}</h1>{% if media.subtitle %}<p class="lead">{{ media.subtitle }}</p>{% endif %}</div>
+      </div>
+      <div class="watch-meta-row">
+        <div class="watch-meta"><span>{{ views_text(media.views) }}</span>{% if media.publish_on %}<span>•</span><span>{{ format_date(media.publish_on) }}</span>{% endif %}</div>
+        <div class="watch-actions">
+          {% if site.show_like or site.show_dislike %}
+          <form class="inline" method="post" action="{{ media_url(media) | replace('/view','/rate') }}">
+            <input type="hidden" name="csrf" value="{{ csrf_token }}">
+            {% if site.show_like %}<button class="reaction-button" name="direction" value="up">♡ <span>{{ t('media.like') }}</span> <b>{{ media.likes }}</b></button>{% endif %}
+            {% if site.show_dislike %}<button class="reaction-button" name="direction" value="down">↓ <span>{{ t('media.dislike') }}</span></button>{% endif %}
+          </form>
+          {% endif %}
+          {% if playable and site.show_download %}<a class="reaction-button" href="{{ file_url(playable, media.slug) }}?download=true">⇩ <span>{{ t('media.download') }}</span></a>{% endif %}
+        </div>
+      </div>
+
+      {% if media.description %}<div class="surface prose-panel"><h2>{{ t('media.about') }}</h2><div class="prose">{{ media.description|safe }}</div></div>{% endif %}
+
+      {% if site.comments_enabled %}
+      <section class="surface comments-panel">
+        <div class="section-heading section-heading--compact"><div><h2>{{ t('section.comments') }}</h2></div></div>
+        <div class="comment-list">{% for c in comments %}<article class="comment"><div class="avatar">{{ (c.author_name or '?')[0]|upper }}</div><div><div class="comment__author">{{ c.author_name }}</div><p>{{ c.body }}</p></div></article>{% else %}<p class="muted">{{ t('empty.comments') }}</p>{% endfor %}</div>
+        <form class="comment-form" method="post" action="{{ media_url(media) | replace('/view','/comment') }}">
+          <input type="hidden" name="csrf" value="{{ csrf_token }}">
+          <div class="form-grid"><label>{{ t('comment.name') }}<input name="name" required maxlength="50"></label><label>{{ t('comment.email') }}<input type="email" name="email"></label></div>
+          <label>{{ t('comment.body') }}<textarea name="body" required placeholder="{{ t('comment.placeholder') }}"></textarea></label>
+          <button>{{ t('comment.submit') }}</button>
+        </form>
+      </section>
+      {% endif %}
+    </div>
+
+    <aside class="watch-sidebar">
+      <div class="surface info-card">
+        <h3>{{ t('media.about') }}</h3>
+        {% if media.author_name %}<div class="info-row"><span>{{ t('admin.author') }}</span><strong>{{ media.author_name }}</strong></div>{% endif %}
+        {% if media.publish_on %}<div class="info-row"><span>{{ t('media.published') }}</span><strong>{{ format_date(media.publish_on) }}</strong></div>{% endif %}
+        <div class="info-row"><span>{{ t('media.views')|capitalize }}</span><strong>{{ media.views }}</strong></div>
+      </div>
+      {% if media.categories %}<div class="surface info-card"><h3>{{ t('media.categories') }}</h3><div class="chip-list">{% for category in media.categories %}<a class="category-chip category-chip--small" href="/categories/{{ category.slug }}">{{ category.name }}</a>{% endfor %}</div></div>{% endif %}
+      {% if media.tags %}<div class="surface info-card"><h3>{{ t('media.tags') }}</h3><div class="chip-list">{% for tag in media.tags %}<a class="tag-chip tag-chip--small" href="/tags/{{ tag.slug }}">#{{ tag.name }}</a>{% endfor %}</div></div>{% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

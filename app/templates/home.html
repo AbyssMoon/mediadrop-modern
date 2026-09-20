@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ site.site_name }}{% endblock %}
+{% macro media_row(item, compact=false) -%}
+  {% set thumb = thumbnail_url(item, 'm') %}
+  {% set preview = preview_file(item) %}
+  <article class="home-media-row {% if compact %}home-media-row--compact{% endif %}">
+    <a class="home-media-row__thumb tone-{{ (item.id or 0) % 6 }}" href="{{ media_url(item) }}">
+      {% if thumb %}<img src="{{ thumb }}" alt="" loading="lazy">{% elif preview %}<img src="{{ file_url(preview, item.slug) }}" alt="" loading="lazy">{% else %}<span class="mini-play">▶</span>{% endif %}
+      {% if item.duration %}<small>{{ '%d:%02d'|format(item.duration // 60, item.duration % 60) }}</small>{% endif %}
+    </a>
+    <div class="home-media-row__body">
+      <h3><a href="{{ media_url(item) }}">{{ item.title }}</a></h3>
+      {% if item.description_plain %}<p>{{ item.description_plain|truncate(105 if compact else 150, true, '…') }}</p>{% endif %}
+      <div class="home-media-row__meta"><span class="view-dot">▶</span>{{ views_text(item.views) }}</div>
+    </div>
+  </article>
+{%- endmacro %}
+{% block content %}
+<section class="classic-home container-wide">
+  <div class="classic-home__grid">
+    <div class="classic-home__main">
+      <div class="classic-section-heading"><h2>{{ t('home.featured') }}</h2></div>
+      {% if featured %}
+        {% set playable = playable_file(featured) %}
+        {% set thumb = thumbnail_url(featured, 'l') %}
+        {% set preview = preview_file(featured) %}
+        <article class="featured-media surface">
+          <div class="featured-media__player tone-{{ (featured.id or 0) % 6 }}">
+            {% if playable and playable.type == 'video' %}
+              <video controls preload="metadata" playsinline {% if thumb %}poster="{{ thumb }}"{% elif preview %}poster="{{ file_url(preview, featured.slug) }}"{% endif %} src="{{ file_url(playable, featured.slug) }}"></video>
+            {% elif playable and playable.type == 'audio' %}
+              <div class="featured-audio"><span>♪</span><audio controls preload="metadata" src="{{ file_url(playable, featured.slug) }}"></audio></div>
+            {% elif thumb %}
+              <a href="{{ media_url(featured) }}"><img src="{{ thumb }}" alt=""></a>
+            {% elif preview %}
+              <a href="{{ media_url(featured) }}"><img src="{{ file_url(preview, featured.slug) }}" alt=""></a>
+            {% else %}
+              <a class="featured-placeholder" href="{{ media_url(featured) }}"><span class="media-card__play media-card__play--large"><span></span></span></a>
+            {% endif %}
+          </div>
+          <div class="featured-media__body">
+            <h1><a href="{{ media_url(featured) }}">{{ featured.title }}</a></h1>
+            {% if featured.description_plain %}<p>{{ featured.description_plain|truncate(190, true, '…') }}</p>{% endif %}
+            <div class="featured-media__meta">
+              <span>{{ views_text(featured.views) }}</span>
+              {% if featured.comments %}<span>•</span><span>{{ featured.comments|length }} {{ t('section.comments')|lower }}</span>{% endif %}
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-state empty-state--compact"><span class="empty-state__icon">▶</span><h3>{{ t('home.no_featured') }}</h3></div>
+      {% endif %}
+
+      <div class="classic-section-heading classic-section-heading--spaced">
+        <h2>{{ t('home.popular') }}</h2><a href="/media?show=popular">{{ t('home.view_more') }} →</a>
+      </div>
+      <div class="home-media-list">
+        {% for item in popular %}{{ media_row(item) }}{% else %}<p class="muted">{{ t('empty.media') }}</p>{% endfor %}
+      </div>
+    </div>
+
+    <aside class="classic-home__latest">
+      <div class="classic-section-heading"><h2>{{ t('home.latest') }}</h2><a href="/media?show=latest">{{ t('home.view_more') }} →</a></div>
+      <div class="home-media-list home-media-list--latest">
+        {% for item in latest %}{{ media_row(item, true) }}{% else %}<p class="muted">{{ t('empty.media') }}</p>{% endfor %}
+      </div>
+    </aside>
+  </div>
+
+  <section class="home-categories">
+    <div class="classic-section-heading"><h2>{{ t('section.categories') }}</h2><a href="/categories">{{ t('home.view_more') }} →</a></div>
+    {% if categories %}
+      <div class="category-strip">
+        {% for category in categories %}<a href="/categories/{{ category.slug }}"><strong>{{ category.name }}</strong>{% if category.children %}<span>{{ category.children|length }}</span>{% endif %}</a>{% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">{{ t('categories.no_categories') }}</p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

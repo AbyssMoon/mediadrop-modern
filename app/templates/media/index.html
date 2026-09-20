@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_media_card.html" import media_card with context %}
+{% block title %}{{ t('media.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section">
+  <div class="page-heading">
+    <div><span class="eyebrow">{{ site.site_name }}</span><h1>{{ t('media.title') }}</h1></div>
+  </div>
+  <form class="filter-bar" method="get" action="/media">
+    <label class="search-field">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z"/></svg>
+      <input name="q" value="{{ q or '' }}" placeholder="{{ t('media.search_placeholder') }}">
+    </label>
+    <select name="show" aria-label="Sort">
+      <option value="latest" {% if show != 'popular' %}selected{% endif %}>{{ t('media.latest') }}</option>
+      <option value="popular" {% if show == 'popular' %}selected{% endif %}>{{ t('media.popular') }}</option>
+    </select>
+    <button>{{ t('media.search') }}</button>
+  </form>
+
+  {% if media %}<div class="media-grid media-grid--catalog">{% for item in media %}{{ media_card(item) }}{% endfor %}</div>
+  {% else %}<div class="empty-state"><span class="empty-state__icon">⌕</span><h3>{{ t('empty.search') if q else t('empty.media') }}</h3></div>{% endif %}
+
+  <nav class="pager">
+    {% if page and page > 1 %}<a class="button button--secondary" href="?page={{ page-1 }}&show={{ show }}{% if q %}&q={{ q|urlencode }}{% endif %}">← {{ t('media.previous') }}</a>{% else %}<span></span>{% endif %}
+    {% if has_next %}<a class="button button--secondary" href="?page={{ page+1 }}&show={{ show }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ t('media.next') }} →</a>{% endif %}
+  </nav>
+</section>
+{% endblock %}

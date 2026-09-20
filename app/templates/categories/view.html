@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% from "_media_card.html" import media_card with context %}
+{% block title %}{{ category.name }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="content-section container-wide page-section">
+  <div class="page-heading"><div><span class="eyebrow">{{ t('section.categories') }}</span><h1>{{ category.name }}</h1></div></div>
+  {% if media %}<div class="media-grid media-grid--catalog">{% for item in media %}{{ media_card(item) }}{% endfor %}</div>
+  {% else %}<div class="empty-state"><span class="empty-state__icon">▶</span><h3>{{ t('empty.media') }}</h3></div>{% endif %}
+</section>
+{% endblock %}
