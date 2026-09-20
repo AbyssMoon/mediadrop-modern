@@ -46,8 +46,11 @@ Public sections:
 - media/podcast view pages, comments, ratings and downloads
 
 The admin now includes Media, Comments, Categories, Podcasts, Users and
-**Settings**. The settings screen intentionally restores only useful product
-settings and drops player/transcoding-era options:
+**Settings**. Categories keep their legacy parent/child structure and can be
+renamed or reparented without a schema change. Users can be created and edited,
+with access assigned through the existing legacy groups/permissions tables.
+The settings screen intentionally restores only useful product settings and
+drops player/transcoding-era options:
 
 - site name and default language
 - featured category
@@ -75,8 +78,10 @@ The other languages already translate the main shell/navigation/settings
 labels and currently fall back to English for strings that have not yet been
 mapped from the old gettext catalogs. Arabic and Hebrew render RTL.
 
-Default language can be selected in **Admin -> Settings**. `LOCALE=ru` remains
-the environment fallback for a fresh database.
+Default language can be selected in **Admin -> Settings**. `LOCALE=en` is the
+environment fallback for a fresh database. The public language switch is kept
+per browser in a cookie; the site-wide default remains stored in the legacy
+`settings` table through the admin settings page.
 
 ## Preserved compatibility
 
@@ -170,8 +175,9 @@ Existing MediaDrop preview images are used as-is from the legacy `images/media`
 directory. In Admin -> Media, a JPEG/PNG/WebP preview can also be uploaded when
 creating or editing a media item. The modern runtime keeps the original and
 generates 16:9 JPEG variants (`s`, `m`, `l`) compatible with the legacy naming
-scheme. The same optional preview field is available on the public upload form
-when public uploads are enabled.
+scheme. New variants are generated at up to 320x180, 960x540 and 1920x1080
+without upscaling above the uploaded source image. The same optional preview
+field is available on the public upload form when public uploads are enabled.
 
 Run this after mounting the legacy data to see how many old previews are found:
 

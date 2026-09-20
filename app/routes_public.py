@@ -10,11 +10,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import db_dependency
-from app.models import Category, Comment, Media, MediaFile, Podcast, Setting, Tag
+from app.models import Category, Comment, Media, MediaFile, Podcast, Setting, Tag, media_categories
 from app.security import validate_csrf
 from app.site_settings import get_site_settings
 from app.services import (
     available_slug,
+    build_category_tree,
     delete_modern_thumbnails,
     ip_to_legacy_int,
     media_file_path,
@@ -36,6 +37,16 @@ def _site_setting(db: Session, key: str, default: str | None = None) -> str | No
 
 def _published_stmt():
     return select(Media).where(Media.published_clause())
+
+
+def _published_category_counts(db: Session) -> dict[int, int]:
+    rows = db.execute(
+        select(media_categories.c.category_id, func.count(func.distinct(Media.id)))
+        .select_from(media_categories.join(Media, Media.id == media_categories.c.media_id))
+        .where(Media.published_clause())
+        .group_by(media_categories.c.category_id)
+    ).all()
+    return {int(category_id): int(count) for category_id, count in rows}
 
 
 def _media_url(media: Media) -> str:
@@ -123,11 +134,11 @@ def explore(request: Request, db: Session = Db):
         db.scalars(
             select(Category)
             .where(Category.parent_id.is_(None))
-            .options(selectinload(Category.children))
             .order_by(Category.name)
             .limit(12)
         ).all()
     )
+    category_counts = _published_category_counts(db)
     return render(
         request,
         "home.html",
@@ -135,6 +146,7 @@ def explore(request: Request, db: Session = Db):
         latest=latest,
         popular=popular,
         categories=categories,
+        category_counts=category_counts,
     )
 
 
@@ -353,36 +365,24 @@ def serve_file(
 
 @router.get("/categories", response_class=HTMLResponse)
 def categories_index(request: Request, db: Session = Db):
-    categories = list(
-        db.scalars(
-            select(Category)
-            .options(selectinload(Category.children))
-            .order_by(Category.parent_id.is_not(None), Category.name)
-        ).all()
-    )
-    counts: dict[int, int] = {}
-    for category in categories:
-        counts[category.id] = int(
-            db.scalar(
-                select(func.count(Media.id))
-                .select_from(Media)
-                .join(Media.categories)
-                .where(Category.id == category.id, Media.published_clause())
-            )
-            or 0
-        )
-    roots = [category for category in categories if category.parent_id is None]
+    categories = list(db.scalars(select(Category).order_by(Category.name)).all())
+    tree = build_category_tree(categories)
+    counts = _published_category_counts(db)
     return render(
         request,
         "categories/index.html",
-        categories=roots,
+        category_tree=tree,
         counts=counts,
     )
 
 
 @router.get("/categories/{slug}", response_class=HTMLResponse)
 def category_view(request: Request, slug: str, db: Session = Db):
-    category = db.scalar(select(Category).where(Category.slug == slug))
+    category = db.scalar(
+        select(Category)
+        .where(Category.slug == slug)
+        .options(selectinload(Category.parent), selectinload(Category.children))
+    )
     if category is None:
         raise HTTPException(404)
     rows = list(
@@ -394,7 +394,16 @@ def category_view(request: Request, slug: str, db: Session = Db):
             .order_by(Media.publish_on.desc())
         ).unique().all()
     )
-    return render(request, "categories/view.html", category=category, media=rows)
+    counts = _published_category_counts(db)
+    children = sorted(category.children, key=lambda child: child.name.casefold())
+    return render(
+        request,
+        "categories/view.html",
+        category=category,
+        children=children,
+        counts=counts,
+        media=rows,
+    )
 
 
 @router.get("/tags", response_class=HTMLResponse)

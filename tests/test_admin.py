@@ -7,12 +7,12 @@ from sqlalchemy import select
 from app.models import Media
 
 
-def _preview_png() -> bytes:
+def _preview_png(width: int = 800, height: int = 450) -> bytes:
     import io
     from PIL import Image
 
     buffer = io.BytesIO()
-    Image.new("RGB", (800, 450), (20, 120, 180)).save(buffer, "PNG")
+    Image.new("RGB", (width, height), (20, 120, 180)).save(buffer, "PNG")
     return buffer.getvalue()
 
 
@@ -31,7 +31,7 @@ def test_legacy_login_and_admin(logged_in):
     _, client, _ = logged_in
     response = client.get("/admin")
     assert response.status_code == 200
-    assert "Панель управления" in response.text
+    assert "Control panel" in response.text
 
 
 def test_admin_can_create_ready_media(logged_in):
@@ -70,7 +70,7 @@ def test_admin_settings_are_saved(logged_in):
     app, client, _ = logged_in
     page = client.get("/admin/settings")
     assert page.status_code == 200
-    assert "Настройки" in page.text
+    assert "Settings" in page.text
     token = _csrf(page.text)
     response = client.post(
         "/admin/settings",
@@ -96,7 +96,42 @@ def test_admin_settings_are_saved(logged_in):
     home = client.get("/")
     assert "Updated MediaDrop" in home.text
     assert "--primary: #123456" in home.text
+    assert 'lang="ru"' in home.text
 
     from app.models import Setting
     with app.state.session_factory() as db:
         assert db.scalar(select(Setting).where(Setting.key == "general_site_name")).value == "Updated MediaDrop"
+
+
+def test_new_thumbnails_reach_fullhd_without_schema_changes(logged_in):
+    app, client, _ = logged_in
+    page = client.get("/admin/media/new")
+    token = _csrf(page.text)
+    response = client.post(
+        "/admin/media/new",
+        data={
+            "csrf": token,
+            "title": "Full HD preview",
+            "slug": "full-hd-preview",
+            "reviewed": "on",
+            "publishable": "on",
+        },
+        files={
+            "file": ("fullhd.mp4", b"ready-media", "video/mp4"),
+            "thumbnail": ("preview.png", _preview_png(2560, 1440), "image/png"),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+    from PIL import Image
+
+    with app.state.session_factory() as db:
+        media = db.scalar(select(Media).where(Media.slug == "full-hd-preview"))
+        assert media is not None
+        media_id = media.id
+
+    media_dir = app.state.settings.image_root / "media"
+    assert Image.open(media_dir / f"{media_id}s.jpg").size == (320, 180)
+    assert Image.open(media_dir / f"{media_id}m.jpg").size == (960, 540)
+    assert Image.open(media_dir / f"{media_id}l.jpg").size == (1920, 1080)

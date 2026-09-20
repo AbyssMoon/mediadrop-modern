@@ -8,8 +8,10 @@ def test_health_and_home(app_env):
     assert client.get("/healthz").text == "ok"
     response = client.get("/")
     assert response.status_code == 200
+    assert 'lang="en"' in response.text
     assert "Sample video" in response.text
     assert "/thumbnails/media/1/m.jpg" in response.text
+    assert re.search(r'href="/categories/demos"[^>]*><strong>Demos</strong><span>1</span>', response.text)
     thumb = client.get("/thumbnails/media/1/m.jpg")
     assert thumb.status_code == 200
     assert thumb.headers["content-type"].startswith("image/jpeg")

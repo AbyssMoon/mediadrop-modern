@@ -24,6 +24,9 @@ Changed:
 - search currently uses normal SQL matching rather than legacy helper tables
 - a compact modern settings UI writes useful values into the existing
   `settings(key,value)` table
+- category hierarchy editing uses the existing `categories.parent_id` column
+- user creation and access assignment reuse legacy users/groups/permissions
+  tables; no new RBAC schema is required
 
 Removed:
 

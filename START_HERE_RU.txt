@@ -543,3 +543,31 @@ Modern runtime работает на реальной legacy DB, все 511 ис
 все 511 legacy previews найдены, основной UI и admin работают. Главные открытые задачи —
 проверка функционального parity на реальных данных, последующий offline FLV->MP4 для 67
 старых роликов, security migration паролей, полный i18n и поздняя очистка legacy schema.
+
+================================================================================
+14. ДОРАБОТКИ ПОСЛЕ HANDOFF (2026-09-20)
+================================================================================
+
+Без изменения legacy schema добавлено:
+
+- новые thumbnails сохраняются под теми же legacy именами s/m/l, но до размеров
+  320x180, 960x540 и 1920x1080; маленькие исходники не увеличиваются;
+- на главной число рядом с категорией теперь означает число опубликованных media,
+  а не количество дочерних категорий;
+- /categories показывает произвольную глубину вложенности как явное дерево;
+- страница категории отдельно показывает дочерние категории и переходы в них;
+- Admin -> Categories показывает ту же иерархию, позволяет менять name/slug/parent;
+  циклическое перемещение категории блокируется;
+- Admin -> Users позволяет создавать и редактировать пользователей и назначать им
+  существующие legacy groups. Effective permissions по-прежнему приходят из
+  users_groups -> groups_permissions -> permissions;
+- fresh install по умолчанию использует English (LOCALE=en). Глобальный язык сайта
+  сохраняется в legacy settings через Admin -> Settings; обычный переключатель языка
+  на публичном UI хранится в cookie конкретного браузера;
+- добавлены regression tests для modern/legacy file deletion, legacy thumbnail
+  сохранности, FullHD previews, category counts/hierarchy, category reparenting,
+  user creation/group permissions и default locale.
+
+Текущий test suite: 17 passed.
+Новых таблиц/колонок для этих изменений не требуется; импорт старой MediaDrop DB
+остаётся dump/restore + read-only legacy media/images без отдельной сложной миграции.

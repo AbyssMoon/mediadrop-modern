@@ -1,27 +1,32 @@
 {% extends "base.html" %}
 {% block title %}{{ t('categories.title') }} — {{ site.site_name }}{% endblock %}
+{% macro category_node(node) -%}
+  {% set category = node.category %}
+  <article class="category-tree-node {% if node.depth %}category-tree-node--nested{% endif %}" style="--category-depth: {{ node.depth }}">
+    <a class="category-tree-node__link surface" href="/categories/{{ category.slug }}">
+      <span class="category-tree-node__icon">{% if node.children %}▦{% else %}▶{% endif %}</span>
+      <span class="category-tree-node__text">
+        <strong>{{ category.name }}</strong>
+        <small>{{ counts.get(category.id, 0) }} {{ t('categories.items') }}{% if node.children %} · {{ node.children|length }} {{ t('categories.subcategories') }}{% endif %}</small>
+      </span>
+      <span class="category-tree-node__open">{{ t('categories.open') }} <b>→</b></span>
+    </a>
+    {% if node.children %}
+      <div class="category-tree-node__children" aria-label="{{ t('categories.subcategories') }}">
+        {% for child in node.children %}{{ category_node(child) }}{% endfor %}
+      </div>
+    {% endif %}
+  </article>
+{%- endmacro %}
 {% block content %}
 <section class="content-section container-wide page-section categories-page">
   <div class="page-heading page-heading--split">
-    <div><span class="eyebrow">{{ t('categories.subtitle') }}</span><h1>{{ t('categories.title') }}</h1></div>
+    <div><span class="eyebrow">{{ t('categories.subtitle') }}</span><h1>{{ t('categories.title') }}</h1><p class="page-heading__note">{{ t('categories.hierarchy_help') }}</p></div>
     <a class="button button--secondary" href="/media">{{ t('hero.all_media') }}</a>
   </div>
-  {% if categories %}
-    <div class="category-grid">
-      {% for category in categories %}
-        <article class="category-card surface">
-          <a class="category-card__main" href="/categories/{{ category.slug }}">
-            <span class="category-card__icon">▦</span>
-            <div><h2>{{ category.name }}</h2><p>{{ counts.get(category.id, 0) }} {{ t('categories.items') }}</p></div>
-            <span class="category-card__arrow">→</span>
-          </a>
-          {% if category.children %}
-            <div class="category-card__children">
-              {% for child in category.children %}<a href="/categories/{{ child.slug }}">{{ child.name }} <span>{{ counts.get(child.id, 0) }}</span></a>{% endfor %}
-            </div>
-          {% endif %}
-        </article>
-      {% endfor %}
+  {% if category_tree %}
+    <div class="category-tree">
+      {% for node in category_tree %}{{ category_node(node) }}{% endfor %}
     </div>
   {% else %}
     <div class="empty-state"><span class="empty-state__icon">▦</span><h3>{{ t('categories.no_categories') }}</h3></div>

@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     max_upload_mb: int = 2047
     max_thumbnail_mb: int = 20
     page_size: int = 20
-    locale: str = "ru"
+    locale: str = "en"
 
 
 @lru_cache

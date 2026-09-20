@@ -1,22 +1,24 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from pathlib import Path
-import re
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import db_dependency
-from app.models import Category, Comment, Media, MediaFile, Podcast, Tag, User
-from app.security import require_admin, validate_csrf
 from app.i18n import LOCALES
+from app.models import Category, Comment, Group, Media, MediaFile, Podcast, Tag, User
+from app.security import hash_legacy_password, require_admin, validate_csrf
 from app.site_settings import get_site_settings, set_setting
 from app.services import (
     available_slug,
+    build_category_tree,
     delete_modern_thumbnails,
+    flatten_category_tree,
     media_file_is_modern,
     media_file_path,
     sanitize_description,
@@ -66,6 +68,65 @@ def _edit_context(db: Session) -> dict:
         "categories": list(db.scalars(select(Category).order_by(Category.name)).all()),
         "podcasts": list(db.scalars(select(Podcast).order_by(Podcast.title)).all()),
     }
+
+
+def _category_rows(db: Session):
+    categories = list(db.scalars(select(Category).order_by(Category.name)).all())
+    return flatten_category_tree(build_category_tree(categories))
+
+
+def _validate_category_parent(db: Session, category_id: int | None, parent_id: int | None) -> None:
+    if not parent_id:
+        return
+    if category_id is not None and parent_id == category_id:
+        raise HTTPException(400, "A category cannot be its own parent")
+    parent = db.get(Category, parent_id)
+    if parent is None:
+        raise HTTPException(400, "Unknown parent category")
+    if category_id is None:
+        return
+    seen: set[int] = set()
+    current = parent
+    while current is not None and current.id not in seen:
+        if current.id == category_id:
+            raise HTTPException(400, "A category cannot be moved below its own descendant")
+        seen.add(current.id)
+        current = db.get(Category, current.parent_id) if current.parent_id else None
+
+
+def _user_groups(db: Session) -> list[Group]:
+    return list(
+        db.scalars(
+            select(Group)
+            .options(selectinload(Group.permissions))
+            .order_by(Group.display_name, Group.group_name)
+        ).all()
+    )
+
+
+def _selected_groups(db: Session, group_ids: list[int]) -> list[Group]:
+    if not group_ids:
+        return []
+    unique_ids = set(group_ids)
+    groups = list(db.scalars(select(Group).where(Group.id.in_(unique_ids))).all())
+    if len(groups) != len(unique_ids):
+        raise HTTPException(400, "Unknown user group")
+    return groups
+
+
+def _validate_user_identity(
+    db: Session,
+    user_name: str,
+    email_address: str,
+    current_id: int | None = None,
+) -> None:
+    stmt = select(User.id).where(
+        or_(User.user_name == user_name, User.email_address == email_address)
+    )
+    if current_id is not None:
+        stmt = stmt.where(User.id != current_id)
+    if db.scalar(stmt) is not None:
+        raise HTTPException(409, "Username or email already exists")
 
 
 @router.get("", response_class=HTMLResponse)
@@ -314,8 +375,8 @@ def comment_delete(
 @router.get("/settings/categories", response_class=HTMLResponse)
 def category_admin(request: Request, db: Session = Db):
     _guard(request, db)
-    rows = list(db.scalars(select(Category).order_by(Category.name)).all())
-    return render(request, "admin/categories.html", categories=rows)
+    rows = _category_rows(db)
+    return render(request, "admin/categories.html", category_rows=rows)
 
 
 @router.post("/categories/new")
@@ -328,10 +389,66 @@ def category_create(
 ):
     _guard(request, db)
     validate_csrf(request, csrf)
+    _validate_category_parent(db, None, parent_id)
+    name = name.strip()
+    if not name:
+        raise HTTPException(400, "Category name cannot be empty")
     slug = slugify(name)[:50]
     if db.scalar(select(Category.id).where(Category.slug == slug)) is not None:
         raise HTTPException(409, "Category slug already exists")
     db.add(Category(name=name, slug=slug, parent_id=parent_id or None))
+    db.commit()
+    return RedirectResponse("/admin/categories", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/categories/{category_id:int}/edit", response_class=HTMLResponse)
+def category_edit(request: Request, category_id: int, db: Session = Db):
+    _guard(request, db)
+    category = db.get(Category, category_id)
+    if category is None:
+        raise HTTPException(404)
+    return render(
+        request,
+        "admin/category_form.html",
+        category=category,
+        category_rows=_category_rows(db),
+    )
+
+
+@router.post("/categories/{category_id:int}/edit")
+def category_save(
+    request: Request,
+    category_id: int,
+    csrf: str = Form(...),
+    name: str = Form(..., min_length=1, max_length=50),
+    slug: str = Form("", max_length=50),
+    parent_id: int | None = Form(None),
+    db: Session = Db,
+):
+    _guard(request, db)
+    validate_csrf(request, csrf)
+    category = db.get(Category, category_id)
+    if category is None:
+        raise HTTPException(404)
+    _validate_category_parent(db, category_id, parent_id)
+    name = name.strip()
+    if not name:
+        raise HTTPException(400, "Category name cannot be empty")
+    # Preserve an explicitly submitted legacy slug byte-for-byte apart from
+    # surrounding whitespace. Renaming/reparenting an imported category must
+    # not silently rewrite old public URLs.
+    normalized_slug = slug.strip() or slugify(name)[:50]
+    duplicate = db.scalar(
+        select(Category.id).where(
+            Category.slug == normalized_slug,
+            Category.id != category_id,
+        )
+    )
+    if duplicate is not None:
+        raise HTTPException(409, "Category slug already exists")
+    category.name = name
+    category.slug = normalized_slug
+    category.parent_id = parent_id or None
     db.commit()
     return RedirectResponse("/admin/categories", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -402,8 +519,98 @@ def podcast_delete(
 @router.get("/users", response_class=HTMLResponse)
 def users(request: Request, db: Session = Db):
     _guard(request, db)
-    rows = list(db.scalars(select(User).order_by(User.user_name)).all())
+    rows = list(
+        db.scalars(
+            select(User)
+            .options(selectinload(User.groups).selectinload(Group.permissions))
+            .order_by(User.user_name)
+        ).all()
+    )
     return render(request, "admin/users.html", users=rows)
+
+
+@router.get("/users/new", response_class=HTMLResponse)
+def user_new(request: Request, db: Session = Db):
+    _guard(request, db)
+    return render(request, "admin/user_form.html", user=None, groups=_user_groups(db))
+
+
+@router.post("/users/new")
+def user_create(
+    request: Request,
+    csrf: str = Form(...),
+    user_name: str = Form(..., min_length=1, max_length=16),
+    email_address: str = Form(..., min_length=3, max_length=255),
+    display_name: str = Form("", max_length=255),
+    password: str = Form(..., min_length=8, max_length=256),
+    group_ids: list[int] = Form(default=[]),
+    db: Session = Db,
+):
+    _guard(request, db)
+    validate_csrf(request, csrf)
+    user_name = user_name.strip()
+    email_address = email_address.strip()
+    if not user_name or not email_address:
+        raise HTTPException(400, "Username and email are required")
+    _validate_user_identity(db, user_name, email_address)
+    user = User(
+        user_name=user_name,
+        email_address=email_address,
+        display_name=display_name.strip() or None,
+        password=hash_legacy_password(password),
+    )
+    user.groups = _selected_groups(db, group_ids)
+    db.add(user)
+    db.commit()
+    return RedirectResponse(f"/admin/users/{user.id}/edit", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/users/{user_id:int}/edit", response_class=HTMLResponse)
+def user_edit(request: Request, user_id: int, db: Session = Db):
+    _guard(request, db)
+    user = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.groups).selectinload(Group.permissions))
+    )
+    if user is None:
+        raise HTTPException(404)
+    return render(request, "admin/user_form.html", user=user, groups=_user_groups(db))
+
+
+@router.post("/users/{user_id:int}/edit")
+def user_save(
+    request: Request,
+    user_id: int,
+    csrf: str = Form(...),
+    user_name: str = Form(..., min_length=1, max_length=16),
+    email_address: str = Form(..., min_length=3, max_length=255),
+    display_name: str = Form("", max_length=255),
+    password: str = Form("", max_length=256),
+    group_ids: list[int] = Form(default=[]),
+    db: Session = Db,
+):
+    _guard(request, db)
+    validate_csrf(request, csrf)
+    user = db.scalar(select(User).where(User.id == user_id).options(selectinload(User.groups)))
+    if user is None:
+        raise HTTPException(404)
+    user_name = user_name.strip()
+    email_address = email_address.strip()
+    if not user_name or not email_address:
+        raise HTTPException(400, "Username and email are required")
+    _validate_user_identity(db, user_name, email_address, current_id=user.id)
+    user.user_name = user_name
+    user.email_address = email_address
+    user.display_name = display_name.strip() or None
+    if password:
+        if len(password) < 8:
+            raise HTTPException(400, "Password must be at least 8 characters")
+        user.password = hash_legacy_password(password)
+    user.groups = _selected_groups(db, group_ids)
+    db.commit()
+    return RedirectResponse(f"/admin/users/{user.id}/edit", status_code=status.HTTP_303_SEE_OTHER)
+
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(
@@ -429,7 +636,7 @@ def settings_save(
     request: Request,
     csrf: str = Form(...),
     site_name: str = Form(..., min_length=1, max_length=255),
-    primary_language: str = Form("ru"),
+    primary_language: str = Form("en"),
     featured_category: int | None = Form(None),
     comments_enabled: str | None = Form(None),
     require_comment_approval: str | None = Form(None),

@@ -71,7 +71,7 @@
     <div class="classic-section-heading"><h2>{{ t('section.categories') }}</h2><a href="/categories">{{ t('home.view_more') }} →</a></div>
     {% if categories %}
       <div class="category-strip">
-        {% for category in categories %}<a href="/categories/{{ category.slug }}"><strong>{{ category.name }}</strong>{% if category.children %}<span>{{ category.children|length }}</span>{% endif %}</a>{% endfor %}
+        {% for category in categories %}<a href="/categories/{{ category.slug }}"><strong>{{ category.name }}</strong><span>{{ category_counts.get(category.id, 0) }}</span></a>{% endfor %}
       </div>
     {% else %}
       <p class="muted">{{ t('categories.no_categories') }}</p>

@@ -6,7 +6,9 @@ import ipaddress
 import mimetypes
 import re
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Iterable
 
 import bleach
 from fastapi import UploadFile
@@ -23,11 +25,80 @@ SAFE_DESCRIPTION_ATTRS = {"a": ["href", "title", "rel"]}
 VIDEO_EXTENSIONS = {"mp4", "m4v", "webm", "ogv", "ogg"}
 AUDIO_EXTENSIONS = {"mp3", "m4a", "aac", "oga", "ogg", "wav", "flac"}
 THUMBNAIL_SIZES: dict[str, tuple[int, int]] = {
-    "s": (160, 90),
-    "m": (320, 180),
-    "l": (640, 360),
+    # Keep legacy s/m/l filenames so imported MediaDrop installations need no
+    # schema or URL migration, but make newly generated previews suitable for
+    # modern high-density displays. Images are never upscaled above the source.
+    "s": (320, 180),
+    "m": (960, 540),
+    "l": (1920, 1080),
 }
 THUMBNAIL_FORMATS = {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}
+
+
+@dataclass(slots=True)
+class CategoryNode:
+    category: Category
+    depth: int = 0
+    children: list["CategoryNode"] = field(default_factory=list)
+
+
+def build_category_tree(categories: Iterable[Category]) -> list[CategoryNode]:
+    """Build a stable hierarchy without relying on eager-loaded relationships.
+
+    Legacy databases can contain orphaned parent ids, so orphaned categories are
+    treated as roots. A defensive visited set also prevents malformed cycles
+    from making templates recurse forever.
+    """
+    ordered = sorted(categories, key=lambda category: (category.name or "").casefold())
+    by_id = {category.id: category for category in ordered if category.id is not None}
+    child_ids: dict[int, list[int]] = {}
+    root_ids: list[int] = []
+    for category in ordered:
+        if category.id is None:
+            continue
+        parent_id = category.parent_id
+        if parent_id is None or parent_id not in by_id or parent_id == category.id:
+            root_ids.append(category.id)
+        else:
+            child_ids.setdefault(parent_id, []).append(category.id)
+
+    visited: set[int] = set()
+
+    def make_node(category_id: int, depth: int, ancestors: set[int]) -> CategoryNode | None:
+        if category_id in visited or category_id in ancestors:
+            return None
+        category = by_id[category_id]
+        visited.add(category_id)
+        node = CategoryNode(category=category, depth=depth)
+        next_ancestors = ancestors | {category_id}
+        for child_id in child_ids.get(category_id, []):
+            child = make_node(child_id, depth + 1, next_ancestors)
+            if child is not None:
+                node.children.append(child)
+        return node
+
+    roots: list[CategoryNode] = []
+    for category_id in root_ids:
+        node = make_node(category_id, 0, set())
+        if node is not None:
+            roots.append(node)
+
+    # A fully cyclic legacy hierarchy has no root. Surface any leftovers as
+    # top-level items instead of hiding them or recursing forever.
+    for category in ordered:
+        if category.id is not None and category.id not in visited:
+            node = make_node(category.id, 0, set())
+            if node is not None:
+                roots.append(node)
+    return roots
+
+
+def flatten_category_tree(nodes: Iterable[CategoryNode]) -> list[CategoryNode]:
+    rows: list[CategoryNode] = []
+    for node in nodes:
+        rows.append(node)
+        rows.extend(flatten_category_tree(node.children))
+    return rows
 
 
 def sanitize_description(value: str) -> tuple[str, str]:
@@ -208,7 +279,7 @@ def delete_modern_thumbnails(settings: Settings, media_id: int) -> None:
 
 
 def save_thumbnail(settings: Settings, media: Media, upload: UploadFile) -> None:
-    """Store a preview image and generate legacy-compatible s/m/l JPEGs."""
+    """Store a preview image and generate high-resolution legacy s/m/l JPEGs."""
     if not media.id:
         raise ValueError("Media must be saved before its preview image")
 
@@ -243,12 +314,29 @@ def save_thumbnail(settings: Settings, media: Media, upload: UploadFile) -> None
     original_ext = THUMBNAIL_FORMATS[Image.open(io.BytesIO(data)).format]
     (media_dir / f"{media.id}orig.{original_ext}").write_bytes(data)
 
+    # Crop once to the 16:9 poster shape, then only downscale. This preserves
+    # the uploaded detail while avoiding pointless enlargement of small images.
+    source_ratio = image.width / image.height
+    target_ratio = 16 / 9
+    if source_ratio > target_ratio:
+        crop_width = max(1, round(image.height * target_ratio))
+        left = max(0, (image.width - crop_width) // 2)
+        poster = image.crop((left, 0, left + crop_width, image.height))
+    elif source_ratio < target_ratio:
+        crop_height = max(1, round(image.width / target_ratio))
+        top = max(0, (image.height - crop_height) // 2)
+        poster = image.crop((0, top, image.width, top + crop_height))
+    else:
+        poster = image
+
     for key, size in THUMBNAIL_SIZES.items():
-        thumb = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+        thumb = poster.copy()
+        if thumb.width > size[0] or thumb.height > size[1]:
+            thumb.thumbnail(size, resample=Image.Resampling.LANCZOS)
         target = media_dir / f"{media.id}{key}.jpg"
         temp = media_dir / f".{media.id}{key}.{uuid.uuid4().hex}.tmp"
         try:
-            thumb.save(temp, format="JPEG", quality=90, optimize=True, progressive=True)
+            thumb.save(temp, format="JPEG", quality=93, optimize=True, progressive=True)
             temp.replace(target)
         finally:
             temp.unlink(missing_ok=True)

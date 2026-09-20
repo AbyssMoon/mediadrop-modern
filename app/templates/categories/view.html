@@ -3,7 +3,25 @@
 {% block title %}{{ category.name }} — {{ site.site_name }}{% endblock %}
 {% block content %}
 <section class="content-section container-wide page-section">
+  <div class="category-breadcrumbs">
+    <a href="/categories">{{ t('categories.title') }}</a>
+    {% if category.parent %}<span>›</span><a href="/categories/{{ category.parent.slug }}">{{ category.parent.name }}</a>{% endif %}
+  </div>
   <div class="page-heading"><div><span class="eyebrow">{{ t('section.categories') }}</span><h1>{{ category.name }}</h1></div></div>
+
+  {% if children %}
+    <section class="category-children-section">
+      <div class="section-heading section-heading--compact"><div><h2>{{ t('categories.subcategories') }}</h2><p>{{ t('categories.subcategories_help') }}</p></div></div>
+      <div class="category-child-grid">
+        {% for child in children %}
+          <a class="category-child-link surface" href="/categories/{{ child.slug }}">
+            <span><strong>{{ child.name }}</strong><small>{{ counts.get(child.id, 0) }} {{ t('categories.items') }}</small></span><b>→</b>
+          </a>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
   {% if media %}<div class="media-grid media-grid--catalog">{% for item in media %}{{ media_card(item) }}{% endfor %}</div>
   {% else %}<div class="empty-state"><span class="empty-state__icon">▶</span><h3>{{ t('empty.media') }}</h3></div>{% endif %}
 </section>

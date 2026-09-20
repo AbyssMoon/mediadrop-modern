@@ -1,3 +1,39 @@
 {% extends "base.html" %}
 {% block title %}{{ t('admin.categories') }} — {{ site.site_name }}{% endblock %}
-{% block content %}<section class="admin-page container-wide">{% include "admin/_nav.html" %}<div class="section-heading section-heading--compact"><div><h2>{{ t('admin.categories') }}</h2></div></div><form class="surface compact-form" method="post" action="/admin/categories/new"><input type="hidden" name="csrf" value="{{ csrf_token }}"><input name="name" required maxlength="50" placeholder="{{ t('admin.category_name') }}"><select name="parent_id"><option value="">{{ t('admin.no_parent') }}</option>{% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select><button>{{ t('admin.add') }}</button></form><div class="surface manage-card">{% for c in categories %}<div class="manage-row"><div><strong>{{ c.name }}</strong><span>/{{ c.slug }}</span></div><form method="post" action="/admin/categories/{{ c.id }}/delete"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button--danger button--small">{{ t('admin.delete') }}</button></form></div>{% else %}<div class="empty-row">—</div>{% endfor %}</div></section>{% endblock %}
+{% block content %}
+<section class="admin-page container-wide">
+  {% include "admin/_nav.html" %}
+  <div class="section-heading section-heading--compact">
+    <div><h2>{{ t('admin.categories') }}</h2><p>{{ t('admin.category_hierarchy_help') }}</p></div>
+  </div>
+
+  <form class="surface compact-form" method="post" action="/admin/categories/new">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+    <input name="name" required maxlength="50" placeholder="{{ t('admin.category_name') }}">
+    <select name="parent_id">
+      <option value="">{{ t('admin.no_parent') }}</option>
+      {% for row in category_rows %}<option value="{{ row.category.id }}">{{ '— ' * row.depth }}{{ row.category.name }}</option>{% endfor %}
+    </select>
+    <button>{{ t('admin.add') }}</button>
+  </form>
+
+  <div class="surface manage-card category-admin-tree">
+    {% for row in category_rows %}
+      {% set c = row.category %}
+      <div class="manage-row category-admin-row {% if row.depth %}category-admin-row--nested{% endif %}" style="--category-indent: {{ row.depth * 24 }}px">
+        <div class="category-admin-row__label">
+          <strong>{{ c.name }}</strong>
+          <span>/{{ c.slug }}{% if c.parent_id %} · {{ t('admin.child_category') }}{% endif %}</span>
+        </div>
+        <div class="manage-row__actions">
+          <a class="button button--secondary button--small" href="/admin/categories/{{ c.id }}/edit">{{ t('admin.edit') }}</a>
+          <form method="post" action="/admin/categories/{{ c.id }}/delete">
+            <input type="hidden" name="csrf" value="{{ csrf_token }}">
+            <button class="button button--danger button--small">{{ t('admin.delete') }}</button>
+          </form>
+        </div>
+      </div>
+    {% else %}<div class="empty-row">—</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -306,7 +306,28 @@ _TRANSLATIONS["ru"].update({
     "categories.title": "Категории",
     "categories.subtitle": "Материалы по разделам",
     "categories.items": "материалов",
+    "categories.subcategories": "подкатегорий",
+    "categories.open": "Открыть",
+    "categories.hierarchy_help": "Вложенные разделы показаны отдельными уровнями — каждый из них можно открыть как самостоятельную категорию.",
+    "categories.subcategories_help": "Откройте вложенный раздел, чтобы увидеть его собственные материалы.",
     "categories.no_categories": "Категории пока не созданы.",
+    "admin.category_hierarchy_help": "Структура показана с учётом вложенности. Категорию можно переименовать, изменить slug или перенести в другой раздел.",
+    "admin.edit_category": "Редактирование категории",
+    "admin.parent_category": "Родительская категория",
+    "admin.parent_category_help": "Нельзя поместить категорию внутрь самой себя или её дочернего раздела.",
+    "admin.category_slug_help": "Slug используется в URL. Не меняйте его без необходимости, если на старые ссылки уже ссылаются.",
+    "admin.child_category": "вложенная",
+    "admin.add_user": "Добавить пользователя",
+    "admin.edit_user": "Редактирование пользователя",
+    "admin.groups": "Группы",
+    "admin.permissions": "Права",
+    "admin.user_groups_help": "Права MediaDrop наследуются через legacy-группы. Выберите группы пользователя — схема старой базы при этом не меняется.",
+    "admin.new_password": "Новый пароль",
+    "admin.password_optional_help": "Оставьте пустым, чтобы сохранить текущий пароль.",
+    "admin.password_help": "Минимум 8 символов. Пока сохраняется совместимый legacy-хеш для возможности отката.",
+    "admin.no_groups": "Группы пока не созданы. Сначала создайте администратора через CLI или импортируйте legacy-группы.",
+    "admin.thumbnail_help": "JPEG, PNG или WebP. Новые 16:9 превью сохраняются в размерах до Full HD без увеличения исходника.",
+    "admin.user_note": "Можно создавать и редактировать пользователей без изменения legacy-схемы. Права назначаются через существующие группы MediaDrop; старые пароли остаются совместимыми на период миграции.",
     "admin.settings": "Настройки",
     "settings.title": "Настройки",
     "settings.subtitle": "Основные параметры сайта без устаревших настроек плееров и конвертации.",
@@ -351,7 +372,28 @@ _TRANSLATIONS["en"].update({
     "categories.title": "Categories",
     "categories.subtitle": "Browse media by section",
     "categories.items": "items",
+    "categories.subcategories": "subcategories",
+    "categories.open": "Open",
+    "categories.hierarchy_help": "Nested sections are shown as separate levels, and each one opens as its own category.",
+    "categories.subcategories_help": "Open a nested section to view the media assigned directly to it.",
     "categories.no_categories": "No categories have been created yet.",
+    "admin.category_hierarchy_help": "The list follows the category hierarchy. You can rename a category, change its slug, or move it under another parent.",
+    "admin.edit_category": "Edit category",
+    "admin.parent_category": "Parent category",
+    "admin.parent_category_help": "A category cannot be moved below itself or one of its descendants.",
+    "admin.category_slug_help": "The slug is part of the public URL. Keep it stable when old links already point to this category.",
+    "admin.child_category": "nested",
+    "admin.add_user": "Add user",
+    "admin.edit_user": "Edit user",
+    "admin.groups": "Groups",
+    "admin.permissions": "Permissions",
+    "admin.user_groups_help": "MediaDrop permissions are inherited through legacy groups. Assign groups here without changing the old database schema.",
+    "admin.new_password": "New password",
+    "admin.password_optional_help": "Leave blank to keep the current password.",
+    "admin.password_help": "At least 8 characters. A legacy-compatible hash is used during the rollback-compatible migration period.",
+    "admin.no_groups": "No groups exist yet. Create an administrator through the CLI or import legacy groups first.",
+    "admin.thumbnail_help": "JPEG, PNG or WebP. New 16:9 previews are stored at up to Full HD without enlarging the source image.",
+    "admin.user_note": "Users can be created and edited without changing the legacy schema. Permissions are assigned through existing MediaDrop groups, and legacy password compatibility is retained during migration.",
     "admin.settings": "Settings",
     "settings.title": "Settings",
     "settings.subtitle": "Essential site options without legacy player and transcoding settings.",
@@ -453,8 +495,8 @@ _EXTRA_TRANSLATIONS: dict[str, dict[str, str]] = {
 }
 
 
-def normalize_locale(value: str | None, fallback: str = "ru") -> str:
-    fallback = fallback if fallback in LOCALES else "ru"
+def normalize_locale(value: str | None, fallback: str = "en") -> str:
+    fallback = fallback if fallback in LOCALES else "en"
     if not value:
         return fallback
     normalized = value.strip().replace("-", "_")
