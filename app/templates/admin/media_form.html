@@ -3,19 +3,19 @@
 {% block content %}
 <section class="admin-page container-wide">{% include "admin/_nav.html" %}
   <div class="section-heading section-heading--compact"><div><h2>{% if media %}{{ t('admin.edit_media') }}{% else %}{{ t('admin.create_media') }}{% endif %}</h2>{% if media %}<p class="muted">#{{ media.id }} · /{{ media.slug }}</p>{% endif %}</div></div>
-  <form class="surface editor-form" method="post" enctype="multipart/form-data">
+  <form class="surface editor-form" method="post" enctype="multipart/form-data"{% if not media %} data-media-create{% endif %}>
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
     <div class="form-grid">
       <label>{{ t('admin.title') }}<input name="title" required maxlength="255" value="{{ media.title if media else '' }}"></label>
-      <label>{{ t('admin.slug') }}<input name="slug" maxlength="50" value="{{ media.slug if media else '' }}"></label>
+      <label><span>{{ t('admin.slug') }}{% if not media %} <span class="field-label-hint">({{ t('admin.slug_help_short') }})</span>{% endif %}</span><input name="slug" maxlength="50" value="{{ media.slug if media else '' }}"></label>
       <label class="wide">{{ t('admin.description') }}<textarea name="description">{{ media.description if media else '' }}</textarea></label>
       <label class="wide">{{ t('admin.notes') }}<textarea name="notes">{{ media.notes if media else '' }}</textarea></label>
-      <label>{{ t('admin.author') }}<input name="author_name" maxlength="50" value="{{ media.author_name if media else '' }}"></label>
-      <label>{{ t('admin.author_email') }}<input name="author_email" type="email" value="{{ media.author_email if media else '' }}"></label>
-      <label>{{ t('admin.podcast') }}<select name="podcast_id"><option value="">—</option>{% for p in podcasts %}<option value="{{ p.id }}" {% if media and media.podcast_id == p.id %}selected{% endif %}>{{ p.title }}</option>{% endfor %}</select></label>
-      <label>{{ t('admin.tags') }}<input name="tags" value="{% if media %}{{ media.tags|map(attribute='name')|join(', ') }}{% endif %}"></label>
-      <fieldset class="wide"><legend>{{ t('admin.categories_field') }}</legend><div class="checkbox-grid">{% for c in categories %}<label class="check"><input type="checkbox" name="category_ids" value="{{ c.id }}" {% if media and c in media.categories %}checked{% endif %}><span>{{ c.name }}</span></label>{% endfor %}</div></fieldset>
-      <label>{{ t('admin.publish_on') }}<input type="datetime-local" name="publish_on" value="{% if media and media.publish_on %}{{ media.publish_on.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"></label>
+      <label>{{ t('admin.author') }}<input name="author_name" maxlength="50" value="{{ media.author_name if media else media_defaults.author_name }}"></label>
+      <label>{{ t('admin.author_email') }}<input name="author_email" type="email" value="{{ media.author_email if media else media_defaults.author_email }}"></label>
+      {% if site.enable_podcasts %}<label>{{ t('admin.podcast') }}<select name="podcast_id"><option value="">—</option>{% for p in podcasts %}<option value="{{ p.id }}" {% if media and media.podcast_id == p.id %}selected{% endif %}>{{ p.title }}</option>{% endfor %}</select></label>{% endif %}
+      <label{% if not site.enable_podcasts %} class="wide"{% endif %}>{{ t('admin.tags') }}<input name="tags" value="{% if media %}{{ media.tags|map(attribute='name')|join(', ') }}{% endif %}"></label>
+      <fieldset class="wide category-picker"><legend>{{ t('admin.categories_field') }}</legend><div class="category-checkbox-columns">{% for row in category_rows %}<label class="category-check{% if row.depth %} category-check--nested{% endif %}" style="--category-indent: {{ row.depth * 18 }}px"><input type="checkbox" name="category_ids" value="{{ row.category.id }}" {% if media and row.category in media.categories %}checked{% endif %}><span class="category-check__label">{% if row.depth %}<span class="category-check__branch" aria-hidden="true">↳</span>{% endif %}<span>{{ row.category.name }}</span></span></label>{% endfor %}</div></fieldset>
+      <label>{{ t('admin.publish_on') }}<input type="datetime-local" name="publish_on" value="{% if media and media.publish_on %}{{ media.publish_on.strftime('%Y-%m-%dT%H:%M') }}{% elif not media %}{{ media_defaults.publish_on }}{% endif %}"></label>
       {% if media %}<label>{{ t('admin.publish_until') }}<input type="datetime-local" name="publish_until" value="{% if media.publish_until %}{{ media.publish_until.strftime('%Y-%m-%dT%H:%M') }}{% endif %}"></label>{% endif %}
       <div class="wide switch-row"><label class="switch"><input type="checkbox" name="reviewed" {% if not media or media.reviewed %}checked{% endif %}><span></span><b>{{ t('admin.reviewed') }}</b></label><label class="switch"><input type="checkbox" name="publishable" {% if not media or media.publishable %}checked{% endif %}><span></span><b>{{ t('admin.publishable') }}</b></label></div>
       <label class="wide file-field"><span>{{ t('admin.ready_file') }}</span><input type="file" name="file" accept="video/*,audio/*"><small>{{ t('admin.no_transcoding') }}</small></label>
@@ -28,4 +28,5 @@
   <form class="danger-zone" method="post" action="/admin/media/{{ media.id }}/delete" onsubmit="return confirm('{{ t('admin.delete_confirm') }}')"><input type="hidden" name="csrf" value="{{ csrf_token }}"><button class="button button--danger">{{ t('admin.delete_media') }}</button></form>
   {% endif %}
 </section>
+{% if not media %}<script src="/static/admin-media.js?v=1" defer></script>{% endif %}
 {% endblock %}

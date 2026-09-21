@@ -15,6 +15,7 @@ from app.security import hash_legacy_password
 @pytest.fixture()
 def app_env(tmp_path: Path):
     database = tmp_path / "test.db"
+    modern_database = tmp_path / "modern.db"
     media_root = tmp_path / "media"
     image_root = tmp_path / "images"
     legacy_media_root = tmp_path / "legacy-media"
@@ -23,6 +24,7 @@ def app_env(tmp_path: Path):
         environment="test",
         secret_key="test-secret-that-is-long-enough",
         database_url=f"sqlite:///{database}",
+        modern_database_url=f"sqlite:///{modern_database}",
         media_root=media_root,
         image_root=image_root,
         legacy_media_root=legacy_media_root,

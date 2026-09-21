@@ -16,7 +16,7 @@ from app.i18n import (
     views_text,
 )
 from app.models import Media, MediaFile
-from app.security import csrf_token
+from app.security import csrf_token, current_principal
 from app.services import thumbnail_path
 from app.site_settings import get_site_settings
 
@@ -97,12 +97,14 @@ def render(request: Request, name: str, **context):
     runtime = request.app.state.settings
     with request.app.state.session_factory() as db:
         site = get_site_settings(db, runtime)
+        principal = current_principal(request, db)
     locale = normalize_locale(
         request.cookies.get("mediadrop_locale"), str(site["primary_language"])
     )
     context.setdefault("request", request)
     context.setdefault("settings", runtime)
     context.setdefault("site", site)
+    context.setdefault("principal", principal)
     context.setdefault("csrf_token", csrf_token(request))
     context.setdefault("locale", locale)
     context.setdefault("locale_dir", locale_dir(locale))

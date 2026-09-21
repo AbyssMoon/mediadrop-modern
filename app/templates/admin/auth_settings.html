@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ t('auth_settings.title') }} — {{ site.site_name }}{% endblock %}
+{% block content %}
+<section class="admin-page container-wide">
+  {% include "admin/_nav.html" %}
+  <div class="page-heading settings-heading">
+    <div><span class="eyebrow">{{ t('admin.panel') }}</span><h2>{{ t('auth_settings.title') }}</h2><p>{{ t('auth_settings.subtitle') }}</p></div>
+  </div>
+  {% if saved %}<div class="notice notice--success">✓ {{ t('settings.saved') }}</div>{% endif %}
+  {% if error %}<div class="alert alert--error">{{ error }}</div>{% endif %}
+
+  <form class="settings-form auth-settings-form" method="post" action="/admin/settings/auth">
+    <input type="hidden" name="csrf" value="{{ csrf_token }}">
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>01</span><div><h3>{{ t('auth_settings.access') }}</h3><p>{{ t('auth_settings.access_help') }}</p></div></div>
+      <div class="settings-section__body">
+        <div class="settings-toggle-grid">
+          <label class="settings-toggle"><input type="checkbox" name="require_login" {% if auth_values.require_login %}checked{% endif %}><span></span><div><b>{{ t('auth_settings.require_login') }}</b><small>{{ t('auth_settings.require_login_help') }}</small></div></label>
+          <label class="settings-upload-limit auth-settings-select">{{ t('auth_settings.session_lifetime') }}
+            <select name="session_ttl_seconds">
+              {% for seconds, label in ttl_options %}<option value="{{ seconds }}" {% if auth_values.session_ttl_seconds == seconds %}selected{% endif %}>{{ t('auth_settings.ttl_' ~ label) }}</option>{% endfor %}
+            </select>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>02</span><div><h3>{{ t('auth_settings.directory') }}</h3><p>{{ t('auth_settings.ldap_help') }}</p></div></div>
+      <div class="settings-section__body">
+        <div class="settings-toggle-grid auth-settings-toggle">
+          <label class="settings-toggle"><input type="checkbox" name="ldap_enabled" {% if auth_values.ldap_enabled %}checked{% endif %}><span></span><div><b>{{ t('auth_settings.ldap_enabled') }}</b><small>{{ t('auth_settings.ldap_priority') }}</small></div></label>
+        </div>
+        <div class="settings-fields settings-fields--ldap">
+          <label class="wide">{{ t('auth_settings.ldap_url') }}<input name="ldap_url" placeholder="ldap://dc.example.test:389" value="{{ auth_values.ldap_url }}"><small>{{ t('auth_settings.ldap_url_help') }}</small></label>
+          <label>{{ t('auth_settings.bind_dn') }}<input name="ldap_bind_dn" autocomplete="username" placeholder="ldap@example.test" value="{{ auth_values.ldap_bind_dn }}"></label>
+          <label>{{ t('auth_settings.bind_password') }}<input type="password" name="ldap_bind_password" autocomplete="new-password" placeholder="{% if has_bind_password %}{{ t('auth_settings.password_unchanged') }}{% endif %}"><small>{{ t('auth_settings.password_encrypted') }}</small></label>
+          {% if has_bind_password %}<label class="settings-checkbox-line wide"><input type="checkbox" name="clear_bind_password"> {{ t('auth_settings.clear_password') }}</label>{% endif %}
+          <label class="wide">{{ t('auth_settings.base_dn') }}<input name="ldap_base_dn" placeholder="DC=example,DC=test" value="{{ auth_values.ldap_base_dn }}"><small>{{ t('auth_settings.base_dn_help') }}</small></label>
+          <label>{{ t('auth_settings.user_base_dn') }}<input name="ldap_user_base_dn" placeholder="OU=People" value="{{ auth_values.ldap_user_base_dn }}"></label>
+          <label>{{ t('auth_settings.user_filter') }}<input name="ldap_user_filter" placeholder="(objectCategory=Person)" value="{{ auth_values.ldap_user_filter }}"><small>{{ t('auth_settings.user_filter_help') }}</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>03</span><div><h3>{{ t('auth_settings.attributes') }}</h3><p>{{ t('auth_settings.attributes_help') }}</p></div></div>
+      <div class="settings-section__body">
+        <div class="settings-fields settings-fields--ldap">
+          <label>{{ t('auth_settings.username_attribute') }}<input name="ldap_username_attribute" value="{{ auth_values.ldap_username_attribute }}"></label>
+          <label>{{ t('auth_settings.display_name_attribute') }}<input name="ldap_display_name_attribute" value="{{ auth_values.ldap_display_name_attribute }}"></label>
+          <label>{{ t('auth_settings.email_attribute') }}<input name="ldap_email_attribute" value="{{ auth_values.ldap_email_attribute }}"></label>
+          <label>{{ t('auth_settings.member_of_attribute') }}<input name="ldap_member_of_attribute" value="{{ auth_values.ldap_member_of_attribute }}"></label>
+          <label class="wide">{{ t('auth_settings.ca_cert_file') }}<input name="ldap_ca_cert_file" placeholder="/etc/ssl/certs/company-ca.pem" value="{{ auth_values.ldap_ca_cert_file }}"><small>{{ t('auth_settings.ca_cert_help') }}</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="settings-section surface">
+      <div class="settings-section__head"><span>04</span><div><h3>{{ t('auth_settings.groups') }}</h3><p>{{ t('auth_settings.groups_help') }}</p></div></div>
+      <div class="settings-section__body">
+        <div class="settings-fields settings-fields--roles">
+          <label>{{ t('auth_settings.access_group') }}<input name="ldap_access_group" placeholder="MediaDrop Users" value="{{ auth_values.ldap_access_group }}"><small>{{ t('auth_settings.access_group_help') }}</small></label>
+          <label>{{ t('auth_settings.editor_group') }}<input name="ldap_editor_group" placeholder="MediaDrop Editors" value="{{ auth_values.ldap_editor_group }}"><small>{{ t('auth_settings.editor_group_help') }}</small></label>
+          <label>{{ t('auth_settings.admin_group') }}<input name="ldap_admin_group" placeholder="MediaDrop Admins" value="{{ auth_values.ldap_admin_group }}"><small>{{ t('auth_settings.admin_group_help') }}</small></label>
+        </div>
+      </div>
+    </section>
+
+    <div class="settings-actions"><button class="button button--primary" type="submit">{{ t('settings.save') }}</button></div>
+  </form>
+</section>
+{% endblock %}

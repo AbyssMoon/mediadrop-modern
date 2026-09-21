@@ -1,15 +1,16 @@
 {% extends "base.html" %}
+{% from "_video_player.html" import video_player with context %}
 {% block title %}{{ media.title }} — {{ site.site_name }}{% endblock %}
 {% block content %}
-<section class="watch-page container-wide">
+<section class="watch-page container-wide" data-watch-page>
   <div class="watch-breadcrumb"><a href="/media">{{ t('media.title') }}</a><span>/</span><span>{{ media.title }}</span></div>
   <div class="watch-layout">
-    <div class="watch-main">
+    <div class="watch-stage">
       <div class="player-shell">
         {% set poster = thumbnail_url(media, 'l') %}
         {% if playable %}
           {% if playable.type == 'audio' %}<div class="audio-art"><span>♪</span></div><audio controls preload="metadata" src="{{ file_url(playable, media.slug) }}"></audio>
-          {% else %}<video controls preload="metadata" playsinline {% if poster %}poster="{{ poster }}"{% endif %} src="{{ file_url(playable, media.slug) }}"></video>{% endif %}
+          {% else %}{{ video_player(file_url(playable, media.slug), poster, true) }}{% endif %}
         {% else %}<div class="player-empty"><span>▶</span><p>{{ t('media.no_file') }}</p></div>{% endif %}
       </div>
       <div class="watch-title-row">
@@ -28,7 +29,20 @@
           {% if playable and site.show_download %}<a class="reaction-button" href="{{ file_url(playable, media.slug) }}?download=true">⇩ <span>{{ t('media.download') }}</span></a>{% endif %}
         </div>
       </div>
+    </div>
 
+    <aside class="watch-sidebar">
+      <div class="surface info-card">
+        <h3>{{ t('media.about') }}</h3>
+        {% if media.author_name %}<div class="info-row"><span>{{ t('admin.author') }}</span><strong>{{ media.author_name }}</strong></div>{% endif %}
+        {% if media.publish_on %}<div class="info-row"><span>{{ t('media.published') }}</span><strong>{{ format_date(media.publish_on) }}</strong></div>{% endif %}
+        <div class="info-row"><span>{{ t('media.views')|capitalize }}</span><strong>{{ media.views }}</strong></div>
+      </div>
+      {% if media.categories %}<div class="surface info-card"><h3>{{ t('media.categories') }}</h3><div class="chip-list">{% for category in media.categories %}<a class="category-chip category-chip--small" href="/categories/{{ category.slug }}">{{ category.name }}</a>{% endfor %}</div></div>{% endif %}
+      {% if media.tags %}<div class="surface info-card"><h3>{{ t('media.tags') }}</h3><div class="chip-list">{% for tag in media.tags %}<a class="tag-chip tag-chip--small" href="/tags/{{ tag.slug }}">#{{ tag.name }}</a>{% endfor %}</div></div>{% endif %}
+    </aside>
+
+    <div class="watch-below">
       {% if media.description %}<div class="surface prose-panel"><h2>{{ t('media.about') }}</h2><div class="prose">{{ media.description|safe }}</div></div>{% endif %}
 
       {% if site.comments_enabled %}
@@ -44,17 +58,6 @@
       </section>
       {% endif %}
     </div>
-
-    <aside class="watch-sidebar">
-      <div class="surface info-card">
-        <h3>{{ t('media.about') }}</h3>
-        {% if media.author_name %}<div class="info-row"><span>{{ t('admin.author') }}</span><strong>{{ media.author_name }}</strong></div>{% endif %}
-        {% if media.publish_on %}<div class="info-row"><span>{{ t('media.published') }}</span><strong>{{ format_date(media.publish_on) }}</strong></div>{% endif %}
-        <div class="info-row"><span>{{ t('media.views')|capitalize }}</span><strong>{{ media.views }}</strong></div>
-      </div>
-      {% if media.categories %}<div class="surface info-card"><h3>{{ t('media.categories') }}</h3><div class="chip-list">{% for category in media.categories %}<a class="category-chip category-chip--small" href="/categories/{{ category.slug }}">{{ category.name }}</a>{% endfor %}</div></div>{% endif %}
-      {% if media.tags %}<div class="surface info-card"><h3>{{ t('media.tags') }}</h3><div class="chip-list">{% for tag in media.tags %}<a class="tag-chip tag-chip--small" href="/tags/{{ tag.slug }}">#{{ tag.name }}</a>{% endfor %}</div></div>{% endif %}
-    </aside>
   </div>
 </section>
 {% endblock %}

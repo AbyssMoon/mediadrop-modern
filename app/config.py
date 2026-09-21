@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     environment: str = "production"
     secret_key: str = Field(default="change-me", min_length=8)
     database_url: str = "sqlite:///./mediadrop.db"
+    # Modern-only settings live outside the legacy MediaDrop schema.
+    modern_database_url: str = "sqlite:///./mediadrop-modern.db"
 
     # Writable roots for files created by the modern application.
     media_root: Path = Path("/data/media")

@@ -30,6 +30,7 @@ services:
       ENVIRONMENT: production
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       DATABASE_URL: mysql+pymysql://${DB_USER:-mediadrop}:${DB_PASSWORD}@db:3306/${DB_NAME:-mediadrop}?charset=utf8mb4
+      MODERN_DATABASE_URL: ${MODERN_DATABASE_URL:-sqlite:////data/modern/mediadrop-modern.db}
       MEDIA_ROOT: /data/media
       IMAGE_ROOT: /data/images
       LEGACY_MEDIA_ROOT: /data/legacy-media
@@ -46,6 +47,8 @@ services:
       # Writable volumes for all new uploads made by the modern application.
       - mediadrop_media:/data/media
       - mediadrop_images:/data/images
+      # Modern-only auth/LDAP settings; legacy database remains untouched.
+      - mediadrop_modern:/data/modern
       # Legacy archive remains read-only; the app falls back to it automatically.
       - ${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/media:/data/legacy-media:ro
       - ${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/images:/data/legacy-images:ro
@@ -54,3 +57,4 @@ volumes:
   mediadrop_db:
   mediadrop_media:
   mediadrop_images:
+  mediadrop_modern:

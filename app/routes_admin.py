@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.database import db_dependency
 from app.i18n import LOCALES
 from app.models import Category, Comment, Group, Media, MediaFile, Podcast, Tag, User
-from app.security import hash_legacy_password, require_admin, validate_csrf
+from app.security import AuthPrincipal, hash_legacy_password, require_admin, require_editor, validate_csrf
 from app.site_settings import get_site_settings, set_setting
 from app.services import (
     available_slug,
@@ -34,7 +34,11 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 Db = Depends(db_dependency)
 
 
-def _guard(request: Request, db: Session) -> User:
+def _guard(request: Request, db: Session) -> AuthPrincipal:
+    return require_editor(request, db)
+
+
+def _admin_guard(request: Request, db: Session) -> AuthPrincipal:
     return require_admin(request, db)
 
 
@@ -64,9 +68,19 @@ def _parse_datetime(value: str | None) -> datetime | None:
 
 
 def _edit_context(db: Session) -> dict:
+    categories = list(db.scalars(select(Category).order_by(Category.name)).all())
     return {
-        "categories": list(db.scalars(select(Category).order_by(Category.name)).all()),
+        "category_rows": flatten_category_tree(build_category_tree(categories)),
         "podcasts": list(db.scalars(select(Podcast).order_by(Podcast.title)).all()),
+    }
+
+
+def _new_media_defaults(principal: AuthPrincipal) -> dict[str, str]:
+    author_name = (principal.display_name.strip() or principal.username)[:50]
+    return {
+        "author_name": author_name,
+        "author_email": principal.email.strip(),
+        "publish_on": datetime.now().replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M"),
     }
 
 
@@ -160,8 +174,14 @@ def media_list(request: Request, q: str | None = None, db: Session = Db):
 
 @router.get("/media/new", response_class=HTMLResponse)
 def media_new(request: Request, db: Session = Db):
-    _guard(request, db)
-    return render(request, "admin/media_form.html", media=None, **_edit_context(db))
+    principal = _guard(request, db)
+    return render(
+        request,
+        "admin/media_form.html",
+        media=None,
+        media_defaults=_new_media_defaults(principal),
+        **_edit_context(db),
+    )
 
 
 @router.post("/media/new")
@@ -184,18 +204,24 @@ def media_create(
     thumbnail: UploadFile | None = File(None),
     db: Session = Db,
 ):
-    _guard(request, db)
+    principal = _guard(request, db)
     validate_csrf(request, csrf)
     description_html, description_plain = sanitize_description(description)
+    effective_author_name = (author_name.strip() or principal.display_name.strip() or principal.username)[:50]
+    effective_author_email = author_email.strip() or principal.email.strip()
     media = Media(
         title=title,
         slug=available_slug(db, slug or title),
         description=description_html,
         description_plain=description_plain,
         notes=notes or None,
-        author_name=author_name,
-        author_email=author_email,
-        podcast_id=podcast_id or None,
+        author_name=effective_author_name,
+        author_email=effective_author_email,
+        podcast_id=(
+            podcast_id or None
+            if get_site_settings(db, request.app.state.settings)["enable_podcasts"]
+            else None
+        ),
         reviewed=reviewed is not None,
         publishable=publishable is not None,
         encoded=False,
@@ -267,7 +293,8 @@ def media_save(
     media.notes = notes or None
     media.author_name = author_name
     media.author_email = author_email
-    media.podcast_id = podcast_id or None
+    if get_site_settings(db, request.app.state.settings)["enable_podcasts"]:
+        media.podcast_id = podcast_id or None
     media.reviewed = reviewed is not None
     media.publishable = publishable is not None
     media.publish_on = _parse_datetime(publish_on) or media.publish_on or datetime.now()
@@ -374,7 +401,7 @@ def comment_delete(
 @router.get("/categories", response_class=HTMLResponse)
 @router.get("/settings/categories", response_class=HTMLResponse)
 def category_admin(request: Request, db: Session = Db):
-    _guard(request, db)
+    _admin_guard(request, db)
     rows = _category_rows(db)
     return render(request, "admin/categories.html", category_rows=rows)
 
@@ -387,7 +414,7 @@ def category_create(
     parent_id: int | None = Form(None),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     _validate_category_parent(db, None, parent_id)
     name = name.strip()
@@ -403,7 +430,7 @@ def category_create(
 
 @router.get("/categories/{category_id:int}/edit", response_class=HTMLResponse)
 def category_edit(request: Request, category_id: int, db: Session = Db):
-    _guard(request, db)
+    _admin_guard(request, db)
     category = db.get(Category, category_id)
     if category is None:
         raise HTTPException(404)
@@ -425,7 +452,7 @@ def category_save(
     parent_id: int | None = Form(None),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     category = db.get(Category, category_id)
     if category is None:
@@ -460,7 +487,7 @@ def category_delete(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     category = db.get(Category, category_id)
     if category is None:
@@ -472,7 +499,7 @@ def category_delete(
 
 @router.get("/podcasts", response_class=HTMLResponse)
 def podcast_admin(request: Request, db: Session = Db):
-    _guard(request, db)
+    _admin_guard(request, db)
     rows = list(db.scalars(select(Podcast).order_by(Podcast.title)).all())
     return render(request, "admin/podcasts.html", podcasts=rows)
 
@@ -485,7 +512,7 @@ def podcast_create(
     description: str = Form(""),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     slug = slugify(title)[:50]
     if db.scalar(select(Podcast.id).where(Podcast.slug == slug)) is not None:
@@ -502,7 +529,7 @@ def podcast_delete(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     podcast = db.get(Podcast, podcast_id)
     if podcast is None:
@@ -518,7 +545,7 @@ def podcast_delete(
 
 @router.get("/users", response_class=HTMLResponse)
 def users(request: Request, db: Session = Db):
-    _guard(request, db)
+    _admin_guard(request, db)
     rows = list(
         db.scalars(
             select(User)
@@ -531,7 +558,7 @@ def users(request: Request, db: Session = Db):
 
 @router.get("/users/new", response_class=HTMLResponse)
 def user_new(request: Request, db: Session = Db):
-    _guard(request, db)
+    _admin_guard(request, db)
     return render(request, "admin/user_form.html", user=None, groups=_user_groups(db))
 
 
@@ -546,7 +573,7 @@ def user_create(
     group_ids: list[int] = Form(default=[]),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     user_name = user_name.strip()
     email_address = email_address.strip()
@@ -567,7 +594,7 @@ def user_create(
 
 @router.get("/users/{user_id:int}/edit", response_class=HTMLResponse)
 def user_edit(request: Request, user_id: int, db: Session = Db):
-    _guard(request, db)
+    _admin_guard(request, db)
     user = db.scalar(
         select(User)
         .where(User.id == user_id)
@@ -590,7 +617,7 @@ def user_save(
     group_ids: list[int] = Form(default=[]),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     user = db.scalar(select(User).where(User.id == user_id).options(selectinload(User.groups)))
     if user is None:
@@ -618,7 +645,7 @@ def settings_page(
     saved: bool = False,
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     site = get_site_settings(db, request.app.state.settings)
     categories = list(db.scalars(select(Category).order_by(Category.name)).all())
     return render(
@@ -652,7 +679,7 @@ def settings_save(
     footer_text: str = Form("", max_length=500),
     db: Session = Db,
 ):
-    _guard(request, db)
+    _admin_guard(request, db)
     validate_csrf(request, csrf)
     if primary_language not in LOCALES:
         raise HTTPException(400, "Unsupported language")

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_video_player.html" import video_player with context %}
 {% block title %}{{ site.site_name }}{% endblock %}
 {% macro media_row(item, compact=false) -%}
   {% set thumb = thumbnail_url(item, 'm') %}
@@ -27,7 +28,7 @@
         <article class="featured-media surface">
           <div class="featured-media__player tone-{{ (featured.id or 0) % 6 }}">
             {% if playable and playable.type == 'video' %}
-              <video controls preload="metadata" playsinline {% if thumb %}poster="{{ thumb }}"{% elif preview %}poster="{{ file_url(preview, featured.slug) }}"{% endif %} src="{{ file_url(playable, featured.slug) }}"></video>
+              {{ video_player(file_url(playable, featured.slug), thumb or (file_url(preview, featured.slug) if preview else none)) }}
             {% elif playable and playable.type == 'audio' %}
               <div class="featured-audio"><span>♪</span><audio controls preload="metadata" src="{{ file_url(playable, featured.slug) }}"></audio></div>
             {% elif thumb %}

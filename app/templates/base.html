@@ -6,7 +6,8 @@
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="{{ site.accent_color }}">
   <title>{% block title %}{{ site.site_name }}{% endblock %}</title>
-  <link rel="stylesheet" href="/static/app.css?v=3">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/app.css?v=8">
 </head>
 <body style="--primary: {{ site.accent_color }}">
   <header class="site-header">
@@ -36,8 +37,9 @@
             {% endfor %}
           </div>
         </details>
-        {% if request.session.get('user_id') %}
-          <a class="header-button {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">{{ t('nav.admin') }}</a>
+        {% if principal %}
+          {% if principal.can_edit %}<a class="header-button {% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin">{{ t('nav.admin') }}</a>{% endif %}
+          {% if not principal.can_edit %}<a class="header-button" href="/logout" title="{{ principal.display_name }}">{{ t('nav.logout') }}</a>{% endif %}
         {% else %}
           <a class="header-button" href="/login">{{ t('nav.login') }}</a>
         {% endif %}
@@ -66,7 +68,14 @@
     <a class="{% if request.url.path.startswith('/media') %}is-active{% endif %}" href="/media"><b>▶</b><span>{{ t('nav.media') }}</span></a>
     <a class="{% if request.url.path.startswith('/categories') %}is-active{% endif %}" href="/categories"><b>▦</b><span>{{ t('nav.categories') }}</span></a>
     {% if site.enable_user_uploads %}<a class="{% if request.url.path.startswith('/upload') %}is-active{% endif %}" href="/upload"><b>＋</b><span>{{ t('nav.upload') }}</span></a>{% endif %}
-    <a class="{% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="{% if request.session.get('user_id') %}/admin{% else %}/login{% endif %}"><b>◉</b><span>{% if request.session.get('user_id') %}{{ t('nav.admin') }}{% else %}{{ t('nav.login') }}{% endif %}</span></a>
+    {% if principal and principal.can_edit %}
+      <a class="{% if request.url.path.startswith('/admin') %}is-active{% endif %}" href="/admin"><b>◉</b><span>{{ t('nav.admin') }}</span></a>
+    {% elif principal %}
+      <a href="/logout"><b>◉</b><span>{{ t('nav.logout') }}</span></a>
+    {% else %}
+      <a href="/login"><b>◉</b><span>{{ t('nav.login') }}</span></a>
+    {% endif %}
   </nav>
+  <script src="/static/player.js?v=2" defer></script>
 </body>
 </html>

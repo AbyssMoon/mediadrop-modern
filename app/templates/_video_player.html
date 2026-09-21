@@ -1,0 +1,61 @@
+{% macro video_player(src, poster=None, allow_wide=false) -%}
+<div class="enhanced-player" data-enhanced-player tabindex="0">
+  <video data-player-video controls preload="metadata" playsinline {% if poster %}poster="{{ poster }}"{% endif %} src="{{ src }}"></video>
+  <div class="player-tools" role="group" aria-label="{{ t('player.extra_controls') }}">
+    <button class="player-tool-button player-tool-button--seek" type="button" data-player-seek="-10" title="{{ t('player.rewind_10') }}" aria-label="{{ t('player.rewind_10') }}">
+      <span aria-hidden="true">↶</span><span>10</span>
+    </button>
+    <button class="player-tool-button player-tool-button--seek" type="button" data-player-seek="10" title="{{ t('player.forward_10') }}" aria-label="{{ t('player.forward_10') }}">
+      <span>10</span><span aria-hidden="true">↷</span>
+    </button>
+
+    <span class="player-tools__divider" aria-hidden="true"></span>
+
+    <label class="player-speed-control" title="{{ t('player.speed') }}">
+      <span>{{ t('player.speed') }}</span>
+      <select data-player-speed aria-label="{{ t('player.speed') }}">
+        <option value="0.5">0.5×</option>
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="1.75">1.75×</option>
+        <option value="2">2×</option>
+      </select>
+    </label>
+
+    <span class="player-tools__spacer"></span>
+
+    {% if allow_wide %}
+    <button class="player-tool-button player-tool-button--wide" type="button" data-player-wide aria-pressed="false"
+      data-enter-label="{{ t('player.wide_mode') }}"
+      data-exit-label="{{ t('player.wide_mode_exit') }}"
+      title="{{ t('player.wide_mode') }}" aria-label="{{ t('player.wide_mode') }}">
+      <span class="player-tool-button__icon" aria-hidden="true">↔</span><span class="player-tool-button__label">{{ t('player.wide') }}</span>
+    </button>
+    {% endif %}
+
+    <button class="player-tool-button player-tool-button--pip" type="button" data-player-pip hidden
+      data-enter-label="{{ t('player.picture_in_picture') }}"
+      data-exit-label="{{ t('player.picture_in_picture_exit') }}"
+      title="{{ t('player.picture_in_picture') }}" aria-label="{{ t('player.picture_in_picture') }}">
+      <span class="player-tool-button__icon" aria-hidden="true">▣</span><span class="player-tool-button__label">PiP</span>
+    </button>
+
+    <details class="player-help" data-player-help>
+      <summary title="{{ t('player.shortcuts') }}" aria-label="{{ t('player.shortcuts') }}"><span aria-hidden="true">i</span></summary>
+      <div class="player-help__panel">
+        <strong>{{ t('player.shortcuts') }}</strong>
+        <p>{{ t('player.shortcuts_hint') }}</p>
+        <dl>
+          <div><dt><kbd>Space</kbd> <kbd>K</kbd></dt><dd>{{ t('player.shortcut_play') }}</dd></div>
+          <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>{{ t('player.shortcut_seek') }}</dd></div>
+          <div><dt><kbd>M</kbd></dt><dd>{{ t('player.shortcut_mute') }}</dd></div>
+          <div><dt><kbd>F</kbd></dt><dd>{{ t('player.shortcut_fullscreen') }}</dd></div>
+          <div><dt><kbd>P</kbd></dt><dd>{{ t('player.shortcut_pip') }}</dd></div>
+        </dl>
+      </div>
+    </details>
+  </div>
+</div>
+{%- endmacro %}

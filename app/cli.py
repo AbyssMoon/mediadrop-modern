@@ -26,18 +26,22 @@ def create_admin(username: str, email: str, password: str | None = None) -> None
         user = db.scalar(select(User).where(User.user_name == username))
         if user is not None:
             raise SystemExit(f"User {username!r} already exists")
-        permission = db.scalar(select(Permission).where(Permission.permission_name == "edit"))
-        if permission is None:
-            permission = Permission(permission_name="edit", description="Edit MediaDrop content")
-            db.add(permission)
-            db.flush()
+        permissions = []
+        for name, description in (("edit", "Edit MediaDrop content"), ("admin", "Administer MediaDrop")):
+            permission = db.scalar(select(Permission).where(Permission.permission_name == name))
+            if permission is None:
+                permission = Permission(permission_name=name, description=description)
+                db.add(permission)
+                db.flush()
+            permissions.append(permission)
         group = db.scalar(select(Group).where(Group.group_name == "admins"))
         if group is None:
             group = Group(group_name="admins", display_name="Administrators")
             db.add(group)
             db.flush()
-        if permission not in group.permissions:
-            group.permissions.append(permission)
+        for permission in permissions:
+            if permission not in group.permissions:
+                group.permissions.append(permission)
         user = User(
             user_name=username,
             email_address=email,
