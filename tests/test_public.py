@@ -109,6 +109,8 @@ def test_video_player_extra_controls_and_no_persistence(app_env):
     assert 'data-player-speed' in page.text
     assert 'data-player-wide' in page.text
     assert 'data-player-pip' in page.text
+    assert 'data-player-mute' in page.text
+    assert 'data-player-fullscreen' in page.text
     assert 'Keyboard shortcuts' in page.text
     assert '<kbd>Space</kbd>' in page.text
     assert '<kbd>F</kbd>' in page.text
@@ -123,6 +125,9 @@ def test_video_player_extra_controls_and_no_persistence(app_env):
     assert "requestPictureInPicture" in script.text
     assert "webkitSetPresentationMode" in script.text
     assert 'video.requestFullscreen' in script.text
+    assert 'data-player-mute' in page.text
+    assert 'volumechange' in script.text
+    assert 'fullscreenchange' in script.text
     assert 'wrapper.requestFullscreen' not in script.text
     assert 'event.code === "Space" && event.target === video' in script.text
     assert 'watch-page--wide' in script.text
@@ -143,4 +148,123 @@ def test_featured_video_uses_same_extra_controls_without_page_wide_mode(app_env)
     assert page.status_code == 200
     assert page.text.count("data-enhanced-player") == 1
     assert 'data-player-wide' not in page.text
-    assert 'src="/static/player.js?v=2"' in page.text
+    assert 'src="/static/player.js?v=4"' in page.text
+
+
+def test_media_play_audit_after_player_threshold_hook(logged_in):
+    app, client, _ = logged_in
+    page = client.get("/media/sample-video/view")
+    assert page.status_code == 200
+    assert 'data-play-audit-url="/api/media/1/play"' in page.text
+    token = re.search(r'data-play-audit-csrf="([^"]+)"', page.text).group(1)
+
+    response = client.post(
+        "/api/media/1/play",
+        headers={"X-CSRF-Token": token},
+    )
+    assert response.status_code == 204
+
+    audit_text = app.state.settings.audit_log_path.read_text(encoding="utf-8")
+    assert '"event":"media.play"' in audit_text
+    assert '"username":"admin"' in audit_text
+    assert '"object_type":"media"' in audit_text
+    assert '"object_id":1' in audit_text
+    assert '"slug":"sample-video"' in audit_text
+
+
+def test_media_play_audit_requires_csrf(logged_in):
+    _, client, _ = logged_in
+    response = client.post("/api/media/1/play")
+    assert response.status_code == 403
+
+
+def test_player_javascript_counts_five_seconds_of_playing_time(app_env):
+    _, client, _ = app_env
+    script = client.get("/static/player.js")
+    assert script.status_code == 200
+    assert "const thresholdMs = 5000" in script.text
+    assert 'video.addEventListener("playing", startClock)' in script.text
+    assert '"pause", "waiting", "stalled", "ended", "emptied"' in script.text
+    assert 'headers: {"X-CSRF-Token": csrf}' in script.text
+    assert "let sent = false" in script.text
+
+
+def test_file_routes_release_db_before_sending_body(app_env):
+    app, _, _ = app_env
+    file_routes = [
+        route
+        for route in app.routes
+        if getattr(route, "path", "").startswith("/files/{file_id:int}")
+    ]
+    assert len(file_routes) == 2
+
+    for route in file_routes:
+        db_dependencies = [
+            dependency
+            for dependency in route.dependant.dependencies
+            if dependency.call is not None and dependency.call.__name__ == "db_dependency"
+        ]
+        assert len(db_dependencies) == 1
+        assert db_dependencies[0].scope == "function"
+
+
+def test_authenticated_comment_identity_is_readonly_and_server_enforced(logged_in):
+    app, client, _ = logged_in
+    page = client.get("/media/sample-video/view")
+    assert page.status_code == 200
+    assert 'name="name" required maxlength="50" value="Admin" readonly aria-readonly="true"' in page.text
+    assert 'type="email" name="email" value="admin@example.test" readonly aria-readonly="true"' in page.text
+
+    token = re.search(r'name="csrf" value="([^"]+)"', page.text).group(1)
+    response = client.post(
+        "/media/sample-video/comment",
+        data={
+            "csrf": token,
+            "name": "Forged name",
+            "email": "forged@example.test",
+            "body": "Authenticated comment",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+    from sqlalchemy import select
+    from app.models import Comment
+
+    with app.state.session_factory() as db:
+        comment = db.scalar(select(Comment).where(Comment.body == "Authenticated comment"))
+        assert comment is not None
+        assert comment.author_name == "Admin"
+        assert comment.author_email == "admin@example.test"
+
+
+def test_anonymous_comment_identity_fields_remain_editable(app_env):
+    _, client, _ = app_env
+    page = client.get("/media/sample-video/view")
+    assert page.status_code == 200
+    assert 'name="name" required maxlength="50">' in page.text
+    assert 'type="email" name="email">' in page.text
+    assert 'value="Admin" readonly' not in page.text
+
+
+def test_native_video_download_control_follows_download_setting(app_env):
+    app, client, _ = app_env
+    from app.site_settings import set_setting
+
+    with app.state.session_factory() as db:
+        set_setting(db, "appearance_show_download", False)
+        db.commit()
+
+    page = client.get("/media/sample-video/view")
+    assert page.status_code == 200
+    assert 'controlslist="nodownload"' in page.text
+    assert '?download=true' not in page.text
+
+    with app.state.session_factory() as db:
+        set_setting(db, "appearance_show_download", True)
+        db.commit()
+
+    page = client.get("/media/sample-video/view")
+    assert page.status_code == 200
+    assert 'controlslist="nodownload"' not in page.text
+    assert '?download=true' in page.text

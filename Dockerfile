@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN addgroup --system mediadrop && adduser --system --ingroup mediadrop mediadrop \
-    && mkdir -p /data/media /data/images /data/modern /data/legacy-media /data/legacy-images && chown -R mediadrop:mediadrop /data
+    && mkdir -p /data/media /data/images /data/modern /data/logs /data/legacy-media /data/legacy-images && chown -R mediadrop:mediadrop /data
 
 COPY pyproject.toml README.md LICENSE /app/
 COPY app /app/app

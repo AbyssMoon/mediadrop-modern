@@ -7,25 +7,34 @@
     <div><span class="eyebrow">{{ t('admin.users') }}</span><h2>{% if user %}{{ t('admin.edit_user') }}{% else %}{{ t('admin.add_user') }}{% endif %}</h2><p>{{ t('admin.user_groups_help') }}</p></div>
     <a class="button button--secondary" href="/admin/users">← {{ t('admin.users') }}</a>
   </div>
-  <form class="surface admin-editor" method="post" action="{% if user %}/admin/users/{{ user.id }}/edit{% else %}/admin/users/new{% endif %}">
+  <form class="surface admin-editor user-editor" method="post" action="{% if user %}/admin/users/{{ user.id }}/edit{% else %}/admin/users/new{% endif %}">
     <input type="hidden" name="csrf" value="{{ csrf_token }}">
+
     <div class="form-grid">
       <label>{{ t('admin.username') }}<input name="user_name" required maxlength="16" value="{{ user.user_name if user else '' }}"></label>
       <label>{{ t('admin.email') }}<input type="email" name="email_address" required maxlength="255" value="{{ user.email_address if user else '' }}"></label>
       <label class="wide">{{ t('admin.name') }}<input name="display_name" maxlength="255" value="{{ user.display_name if user and user.display_name else '' }}"></label>
       <label class="wide">{% if user %}{{ t('admin.new_password') }}{% else %}{{ t('login.password') }}{% endif %}<input type="password" name="password" {% if not user %}required minlength="8"{% endif %} maxlength="256" autocomplete="new-password"><small>{% if user %}{{ t('admin.password_optional_help') }}{% else %}{{ t('admin.password_help') }}{% endif %}</small></label>
+
+      <label class="settings-toggle user-status-toggle wide">
+        <input type="checkbox" name="enabled" {% if user_enabled %}checked{% endif %}>
+        <span></span>
+        <div><b>{{ t('admin.user_enabled') }}</b><small>{{ t('admin.user_enabled_help') }}</small></div>
+      </label>
     </div>
 
     <fieldset class="group-picker">
       <legend>{{ t('admin.groups') }}</legend>
-      {% for group in groups %}
-        <label class="group-option">
-          <input type="checkbox" name="group_ids" value="{{ group.id }}" {% if user and group in user.groups %}checked{% endif %}>
-          <span><strong>{{ group.display_name or group.group_name }}</strong><small>{{ group.group_name }}{% if group.permissions %} · {{ t('admin.permissions') }}: {% for permission in group.permissions %}{{ permission.permission_name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</small></span>
-        </label>
-      {% else %}
-        <p class="muted">{{ t('admin.no_groups') }}</p>
-      {% endfor %}
+      <div class="group-picker__list">
+        {% for group in groups %}
+          <label class="group-option">
+            <input type="checkbox" name="group_ids" value="{{ group.id }}" {% if user and group in user.groups %}checked{% endif %}>
+            <span><strong>{{ group.display_name or group.group_name }}</strong><small>{{ group.group_name }}{% if group.permissions %} · {{ t('admin.permissions') }}: {% for permission in group.permissions %}{{ permission.permission_name }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</small></span>
+          </label>
+        {% else %}
+          <p class="muted">{{ t('admin.no_groups') }}</p>
+        {% endfor %}
+      </div>
     </fieldset>
 
     <div class="form-actions"><button>{{ t('admin.save') }}</button></div>

@@ -1,40 +1,47 @@
 # MediaDrop Modern
 
-MediaDrop Modern is a small Python 3 runtime for existing MediaDrop installations.
-It keeps the legacy MediaDrop data model and file layout where that provides useful
-migration compatibility, while replacing the old Python 2 / Pylons runtime with a
-maintainable FastAPI application.
+MediaDrop Modern is a Python 3 / FastAPI runtime for existing MediaDrop installations.
+It keeps the legacy MediaDrop content schema and file layout where that helps migration,
+while replacing the old Python 2 / Pylons runtime with a small maintainable application.
 
-Current release: **0.5.4**.
+Current release: **0.6.6**.  
+Current automated suite: **43 passing tests**.
 
-The project is already functional on an imported real-world legacy database and
-media library. The current automated suite contains **32 passing tests**. Remaining
-work is mostly operational cleanup rather than a rewrite: converting old FLV-only
-media, migrating legacy password hashes later, completing lower-priority translations,
-and eventually cleaning unused legacy schema after the rollback window is closed.
+For production installation and storage mapping, start with:
 
-Upstream project: https://github.com/mediadrop/mediadrop
+- [Развёртывание и реальные Docker mounts](docs/DEPLOYMENT_RU.md)
+- [Эксплуатация, backup/restore и upgrade](docs/OPERATIONS_RU.md)
+- [Migration notes](MIGRATION_NOTES.md)
+- [Краткий контекст проекта](START_HERE_RU.txt)
 
-## Design goals
+Upstream historical project: <https://github.com/mediadrop/mediadrop>
 
-- Preserve existing MediaDrop content and the important URL shapes.
-- Import an old MediaDrop database without a complex mandatory schema migration.
-- Keep the copied legacy media/images read-only during transition.
-- Store new uploads separately from the migration source.
-- Do not bring back the old transcoding/encoder/player framework.
-- Keep the application server-rendered and simple to operate.
+## What the project preserves
+
+The compatibility boundary is intentionally narrow:
+
+- the useful legacy MediaDrop MariaDB tables for media, files, categories, tags,
+  podcasts, comments, settings and local users/groups/permissions;
+- legacy local-file `unique_id` references;
+- legacy preview layout;
+- important public URL shapes;
+- publication/review semantics that matter for imported content.
+
+The project intentionally does **not** revive the old Python 2 framework, Flash/RTMP,
+transcoding queues, encoder profiles or the legacy plugin/player runtime.
 
 ## Stack
 
-- Python 3.13 (project requirement: Python >= 3.12)
+- Python 3.13; project requirement Python >= 3.12
 - FastAPI / Starlette
 - SQLAlchemy 2.x
 - Jinja2 + plain CSS/JavaScript
 - Uvicorn
 - MariaDB 11.4 in Docker Compose
-- Pillow for thumbnails
-- ldap3 for LDAP / Active Directory
-- cryptography for encrypted LDAP bind-password storage
+- SQLite sidecar for modern-only configuration
+- Pillow
+- ldap3 + cryptography
+- Argon2id local-account authentication
 - native browser `<video>` / `<audio>` playback
 - pytest
 
@@ -44,57 +51,125 @@ There is no Node/npm frontend build.
 
 ### Public site
 
-- overview/home page with featured, popular and latest media;
+- home/overview;
 - media library and search;
 - hierarchical categories;
 - tags;
 - podcasts when enabled;
 - media and podcast pages;
 - comments and moderation settings;
-- like/dislike controls when enabled;
+- like/dislike when enabled;
 - downloads when enabled;
-- RSS, podcast feeds and sitemap when enabled;
+- RSS/podcast feeds and sitemap when enabled;
 - JSON API under `/api`;
-- legacy-shaped media and podcast URLs where compatibility matters.
+- compatibility URL shapes where needed.
+
+Authenticated comments use the signed-in identity automatically: Name and Email are
+pre-filled and read-only, and the backend overwrites submitted identity fields with
+the authenticated principal. Anonymous visitors retain editable fields when anonymous
+site access is allowed.
 
 ### Player
 
-The native browser video element remains the foundation. A small enhancement toolbar
-adds:
+The browser-native media element remains the base player. The custom toolbar adds:
 
 - seek -10 / +10 seconds;
-- playback speed from 0.5x to 2x;
+- playback speed 0.5x .. 2x;
+- mute/unmute;
+- fullscreen;
 - Picture-in-Picture when supported;
-- keyboard-shortcut help;
-- a non-persistent wide mode on media pages.
+- wide mode on media pages;
+- keyboard-shortcut help.
 
-Shortcuts: `Space`/`K` play-pause, Left/Right seek, `M` mute, `F` fullscreen and `P`
-Picture-in-Picture. No player preference is stored in the database or browser storage.
+Shortcuts: `Space`/`K` play-pause, Left/Right seek, `M` mute, `F` fullscreen,
+`P` Picture-in-Picture.
+
+When the site setting disables downloads, video elements receive
+`controlslist="nodownload"`. Supporting browsers hide the native Download action.
+This is UI control, not DRM: a browser still has to receive media bytes to play them.
+
+Since 0.6.4, `/files/*` uses a function-scoped DB dependency. Rapid HTML5 Range/seek
+requests therefore do not hold SQLAlchemy connections for the duration of file transfer.
 
 ### Administration
 
 - dashboard;
 - media create/edit/delete;
-- upload of already browser-ready video/audio files;
+- browser-ready video/audio upload;
 - preview upload and regeneration;
-- hierarchical category selection in media forms;
-- comments and moderation;
+- hierarchical category selection;
+- comment moderation;
 - category create/edit/delete/reparent with cycle protection;
 - podcast management;
-- local user management through the existing legacy groups/permissions model;
+- local user management through legacy groups/permissions;
 - site settings;
-- authentication / LDAP settings.
+- authentication and LDAP settings.
 
-On new media creation:
+On new media creation the slug remains editable, author/name defaults come from the
+signed-in identity, publication time defaults to now, and podcast fields follow the
+site feature setting.
 
-- Slug is generated from the title and remains editable;
-- server-side Unidecode normalization provides a broad-script fallback;
-- author and author email default to the signed-in local/LDAP identity;
-- publication date/time defaults to the current time;
-- the Podcast field is hidden when podcasts are disabled.
+## Storage model
 
-The category picker follows the real `parent_id` hierarchy and fills visual columns
-top-to-bottom before moving to the next column.
+MediaDrop Modern deliberately separates the imported archive from data created by the
+new runtime.
+
+Default production host mapping:
+
+| Host | Container | Purpose | Mode |
+| --- | --- | --- | --- |
+| `/opt/mediadrop-modern-data/media` | `/data/media` | new media | rw |
+| `/opt/mediadrop-modern-data/images` | `/data/images` | new previews | rw |
+| `/opt/mediadrop-modern-data/modern` | `/data/modern` | modern SQLite | rw |
+| `/opt/mediadrop-modern-data/logs` | `/data/logs` | audit logs | rw |
+| `/opt/mediadrop_data/media` | `/data/legacy-media` | old media | **ro** |
+| `/opt/mediadrop_data/images` | `/data/legacy-images` | old images | **ro** |
+| Docker named volume | `/var/lib/mysql` in `db` | MariaDB | rw |
+
+The host roots are configurable in `.env`:
+
+```dotenv
+COMPOSE_PROJECT_NAME=mediadrop-modern
+MODERN_DATA_ROOT=/opt/mediadrop-modern-data
+LEGACY_DATA_ROOT=/opt/mediadrop_data
+```
+
+`COMPOSE_PROJECT_NAME` is intentionally stable because it determines the MariaDB named
+volume name. With the default value the volume is:
+
+```text
+mediadrop-modern_mediadrop_db
+```
+
+Do not use `docker compose down -v` for a routine upgrade.
+
+See [docs/DEPLOYMENT_RU.md](docs/DEPLOYMENT_RU.md) for the complete mount/permissions
+procedure and verification commands.
+
+## Databases
+
+### Legacy-compatible MariaDB
+
+The main database continues to use the relevant MediaDrop tables. Imported content and
+new MediaDrop content live there, preserving the compatibility boundary.
+
+### Modern sidecar SQLite
+
+Modern-only configuration uses:
+
+```text
+MODERN_DATABASE_URL=sqlite:////data/modern/mediadrop-modern.db
+```
+
+With the default bind mount the physical host file is:
+
+```text
+/opt/mediadrop-modern-data/modern/mediadrop-modern.db
+```
+
+It stores modern auth/LDAP/account state and does not replace the legacy content DB.
+Keep `SECRET_KEY` stable when moving/restoring it because the saved LDAP bind password
+is encrypted with a key derived from `SECRET_KEY`.
 
 ## Thumbnails
 
@@ -107,127 +182,58 @@ images/media/<media_id>l.jpg
 images/media/<media_id>orig.<ext>
 ```
 
-New previews use the same `s/m/l` filenames for compatibility, but are generated at
-modern sizes:
+New previews use the same compatible names with modern limits:
 
 - `s`: up to 320x180
 - `m`: up to 960x540
 - `l`: up to 1920x1080
 
-Small source images are not upscaled. JPEG, PNG and WebP uploads are accepted.
-
-## Languages
-
-Fresh installations default to **English** (`LOCALE=en`). The site-wide default
-language can be changed in **Admin -> Settings** and is stored in the legacy
-`settings` table. The public language selector is per-browser.
-
-Russian and English cover the current modern UI. Historical MediaDrop locales are
-also exposed and fall back to English for strings not yet migrated. Arabic and Hebrew
-render RTL.
-
-## Data model and storage
-
-MediaDrop Modern deliberately separates legacy-compatible data from modern-only
-configuration.
-
-### Legacy database
-
-The main MariaDB database continues to use the relevant MediaDrop tables, including
-media, media files, categories, tags, podcasts, comments, settings and local
-users/groups/permissions.
-
-This is the compatibility boundary that makes a straightforward legacy import possible.
-
-### Modern sidecar database
-
-Modern-only authentication configuration is stored separately through
-`MODERN_DATABASE_URL`. Docker defaults to:
-
-```text
-/data/modern/mediadrop-modern.db
-```
-
-The sidecar currently stores settings such as mandatory sign-in, session lifetime and
-LDAP configuration. It does **not** contain imported media/content and it does not
-modify the legacy schema.
-
-If the sidecar is absent on a migrated installation, it is recreated automatically
-with migration-safe defaults: public access and LDAP disabled.
-
-### Media files
-
-Docker keeps old and new data separate:
-
-```text
-/data/legacy-media   old MediaDrop media, read-only
-/data/legacy-images  old MediaDrop images, read-only
-/data/media          new uploads, writable
-/data/images         new previews, writable
-/data/modern         modern sidecar database, writable
-```
-
-When resolving a local media file, the application checks the modern writable root and
-then the legacy read-only root. Deleting modern media removes only modern files; legacy
-source files are never deleted by the modern runtime.
+Small sources are not upscaled. JPEG, PNG and WebP are accepted.
 
 ## Authentication and LDAP
 
-**Admin -> Authentication** supports:
+Admin -> Authentication supports:
 
 - public site or mandatory sign-in;
-- session-cookie lifetime of 8 hours, 1 day, 1 week or 30 days;
+- session lifetime 8 hours / 1 day / 1 week / 30 days;
 - LDAP enable/disable;
 - `ldap://` and `ldaps://`;
-- bind/service account and encrypted bind password;
+- service/bind account with encrypted password;
 - Base DN and user search base;
-- user filter and username/display-name/email/group attribute names;
-- optional CA certificate for internal LDAPS PKI;
+- configurable filter and attribute names;
+- internal CA certificate for LDAPS;
 - Access, Editor and Admin group mappings.
+
+Authentication order is LDAP first, then the local MediaDrop account. This preserves
+local break-glass/admin accounts. LDAP identities are not synchronized into the legacy
+`users` table.
+
+Local passwords are authenticated with Argon2id. Existing legacy SHA-1 credentials are
+upgraded lazily after successful login while the historical hash remains available for
+the rollback window.
 
 Role model:
 
-- **Access**: may sign in and view the site when authentication is required;
+- **Access**: sign in and view when authentication is required;
 - **Editor**: Access + media/comment administration and uploads;
 - **Admin**: Editor + settings, authentication, users, categories and podcasts.
 
-LDAP is tried first; if it does not authenticate the submitted credentials, the
-existing local MediaDrop account is tried. This preserves local break-glass/admin
-accounts. LDAP users are not synchronized into the legacy `users` table.
-
-Direct `memberOf` values are used for group mapping; nested LDAP groups are not
-expanded. The historical local group name `admins` remains full-admin compatible even
-on installations where it only has the old `edit` permission.
-
-The LDAP bind password is encrypted with a key derived from `SECRET_KEY`. Keep
-`SECRET_KEY` stable when moving the sidecar database. Changing it invalidates existing
-sessions and requires entering the LDAP bind password again, but does not affect
-legacy content.
-
-Typical Active Directory-shaped values:
-
-```text
-LDAP URL:               ldap://dc.example.test:389
-Base DN:                DC=example,DC=test
-User search base:       OU=People
-User filter:            (objectCategory=Person)
-Username attribute:     sAMAccountName
-Display name attribute: displayName
-Email attribute:        mail
-Group attribute:        memberOf
-Bind DN:                ldap@example.test
-```
-
-For LDAPS use `ldaps://...:636` and configure a trusted CA when the directory uses an
-internal certificate authority.
+Direct `memberOf` values are used for LDAP group mapping; nested groups are not expanded.
 
 ## Fresh installation
 
+Copy and edit the environment file first:
+
 ```sh
 cp .env.example .env
-# Set DB_PASSWORD, DB_ROOT_PASSWORD and SECRET_KEY.
-# COOKIE_SECURE=false is useful only for direct local HTTP testing.
+```
 
+Set at least `DB_PASSWORD`, `DB_ROOT_PASSWORD` and `SECRET_KEY`. Verify the host storage
+paths before starting containers.
+
+For a **new empty** database only:
+
+```sh
 docker compose build
 docker compose up -d db
 docker compose run --rm app mediadrop init-db
@@ -235,18 +241,25 @@ docker compose run --rm app mediadrop create-admin admin admin@example.com
 docker compose up -d
 ```
 
-The application binds to `127.0.0.1:8080` by default. Put nginx/Caddy or another
-reverse proxy in front for HTTPS and public traffic.
+The app binds to `127.0.0.1:8080` by default. If the HTTPS reverse proxy runs on a
+separate host, set `BIND_ADDR` to the private interface address reachable by that proxy
+(or use `0.0.0.0` with a strict firewall). See `docs/DEPLOYMENT_RU.md`.
 
-`mediadrop init-db` is for a **new empty installation only**.
+Do **not** run `mediadrop init-db` on an imported MediaDrop database.
 
-## Importing an existing MediaDrop installation
+## Legacy migration
 
-1. Back up the old database and data tree.
-2. Restore the old SQL dump into MariaDB.
-3. Do **not** run `mediadrop init-db` against the imported database.
-4. Point `LEGACY_DATA_ROOT` to the copied old data tree.
-5. Run the read-only checks:
+For an existing MediaDrop installation:
+
+1. back up the SQL dump and legacy file tree;
+2. restore the legacy SQL to MariaDB;
+3. put old `media/` and `images/` below `LEGACY_DATA_ROOT`;
+4. keep those mounts read-only;
+5. do not run `mediadrop init-db`;
+6. run the read-only validation helpers;
+7. start and smoke-test representative content.
+
+Validation:
 
 ```sh
 docker compose run --rm app python scripts/check_legacy_db.py
@@ -254,61 +267,58 @@ docker compose run --rm app python scripts/check_legacy_thumbnails.py
 docker compose run --rm app python scripts/list_unplayable_media.py
 ```
 
-6. Start the application and verify representative content/admin workflows.
+For old FLV-only content use the offline migration helper described in
+`MIGRATION_NOTES.md`; the legacy FLV source remains untouched until the rollback window
+is closed.
 
-See [MIGRATION_NOTES.md](MIGRATION_NOTES.md) for the detailed migration and FLV cleanup
-strategy.
+## Reverse proxy and media delivery
 
-## FLV and other unsupported legacy media
+Default:
 
-The modern runtime intentionally does not include Flash or an automatic transcoding
-pipeline. Use the inventory helper to find imported media that have no browser-ready
-variant:
-
-```sh
-docker compose run --rm app python scripts/list_unplayable_media.py
+```dotenv
+MEDIA_SERVE_MODE=app
 ```
 
-For FLV-only content, keep the original legacy file unchanged, convert a copy offline
-to MP4/H.264/AAC, validate it with `ffprobe`/`ffmpeg`, and attach the new MP4 to the
-same media item through Admin. The new file is written to `/data/media`; the old FLV
-stays read-only in `/data/legacy-media`. When both are present, the modern player uses
-the browser-ready variant.
+Keep this mode when nginx is an external reverse proxy and does not share the app's
+filesystem. The app handles Range requests and nginx proxies the response.
 
-This keeps the legacy source intact and makes rollback straightforward.
+Use `MEDIA_SERVE_MODE=nginx` only when nginx can read the media filesystem itself and
+is explicitly configured for `X-Accel-Redirect`.
 
-## Updating an existing MediaDrop Modern installation
+This distinction matters in deployments with a separate corporate nginx host: a
+remote reverse proxy cannot resolve container paths such as `/data/media` by itself.
 
-Do not run `init-db` again. Back up `.env` and the databases/volumes, replace the
-source tree, rebuild and inspect logs:
+## Backup and restore
 
-```sh
-cp .env .env.backup
-docker compose build
-docker compose up -d
-docker compose logs --tail=100 app
-```
+`scripts/backup.sh` runs on the Docker host and backs up:
 
-Release 0.5.4 does not require a legacy schema or modern-sidecar schema migration.
+- MariaDB as `mariadb.sql.gz`;
+- modern SQLite using the SQLite backup API;
+- new `/data/media` and `/data/images` as `files.tar.gz`;
+- `.env` and `compose.yml`;
+- SHA256 manifest.
 
-## Development and checks
+The large read-only legacy archive is intentionally not duplicated by that script and
+must have independent retention/backup.
+
+See [docs/OPERATIONS_RU.md](docs/OPERATIONS_RU.md).
+
+## Development
 
 ```sh
 python -m venv .venv
 . .venv/bin/activate
 pip install -e '.[dev]'
 pytest -q
-ruff check .
-uvicorn app.main:app --reload
 ```
 
-Current release verification:
+Current expected result:
 
 ```text
-32 passed
+43 passed
 ```
 
-Additional useful checks:
+Additional checks used for releases:
 
 ```sh
 python -m compileall app scripts
@@ -316,27 +326,43 @@ node --check app/static/player.js
 node --check app/static/admin-media.js
 ```
 
-## Known follow-up work
+## Release building
 
-These are intentionally not blockers for committing or operating the current runtime:
+Use the release helper so runtime DBs, logs, secrets and caches are excluded:
 
-- convert remaining FLV-only legacy media to MP4 offline;
-- after the rollback window, replace legacy SHA1 password storage with Argon2id
-  rehash-on-login and a controlled schema migration;
-- finish historical translations beyond Russian/English;
-- optionally switch high-volume media delivery to nginx `X-Accel-Redirect`;
-- only after migration confidence is high, inventory and remove truly unused legacy
-  encoder/player/fulltext schema.
+```sh
+./scripts/build_release.sh
+```
 
-## Security notes
+Artifacts are written to `dist/` with SHA256 files.
 
-- Never commit `.env` or real credentials.
-- Use a long random `SECRET_KEY` and database passwords.
-- Use HTTPS in production and keep `COOKIE_SECURE=true` there.
-- Keep copied legacy media/images read-only during migration.
-- Do not expose Uvicorn directly to the Internet unless intentionally protected.
-- Legacy SHA1 password support exists only for transition compatibility.
+## Upgrade safety checklist
+
+Before replacing code:
+
+```text
+[ ] backup completed successfully
+[ ] .env preserved
+[ ] COMPOSE_PROJECT_NAME unchanged
+[ ] MODERN_DATA_ROOT unchanged or deliberately migrated
+[ ] LEGACY_DATA_ROOT unchanged or deliberately migrated
+[ ] MariaDB named volume still resolves to the expected volume
+[ ] no docker compose down -v
+```
+
+After upgrade:
+
+```sh
+docker compose build --no-cache app
+docker compose up -d
+docker compose ps
+curl -fsS http://127.0.0.1:8080/healthz
+pytest -q
+```
+
+Then verify login, LDAP if enabled, legacy playback, new upload, preview creation,
+rapid seeking, comments, download setting and audit logging.
 
 ## License
 
-GPL-3.0-or-later, matching upstream MediaDrop.
+GPL-3.0-or-later. See `LICENSE`.

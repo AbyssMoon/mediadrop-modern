@@ -7,7 +7,9 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.database import build_session_factory
+from app.local_accounts import set_local_user_enabled, set_modern_password
 from app.models import Base, Group, Permission, User
+from app.modern_database import build_modern_session_factory
 from app.security import hash_legacy_password
 
 
@@ -21,6 +23,7 @@ def init_db() -> None:
 def create_admin(username: str, email: str, password: str | None = None) -> None:
     settings = get_settings()
     engine, factory = build_session_factory(settings)
+    modern_engine, modern_factory = build_modern_session_factory(settings)
     password = password or getpass.getpass("Password: ")
     with factory() as db:
         user = db.scalar(select(User).where(User.user_name == username))
@@ -50,9 +53,15 @@ def create_admin(username: str, email: str, password: str | None = None) -> None
         )
         user.groups.append(group)
         db.add(user)
+        db.flush()
+        with modern_factory() as modern_db:
+            set_modern_password(modern_db, user.id, password)
+            set_local_user_enabled(modern_db, user.id, True)
+            modern_db.commit()
         db.commit()
     engine.dispose()
-    print(f"Created admin user {username!r}.")
+    modern_engine.dispose()
+    print(f"Created admin user {username!r} with Argon2id authentication.")
 
 
 def main() -> None:

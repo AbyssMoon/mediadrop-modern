@@ -33,6 +33,7 @@ def app_env(tmp_path: Path):
         public_uploads=True,
         uploads_require_review=False,
         max_upload_mb=10,
+        audit_log_path=tmp_path / "audit.log",
     )
     app = create_app(settings)
     Base.metadata.create_all(app.state.engine)

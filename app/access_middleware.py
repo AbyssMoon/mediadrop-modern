@@ -34,9 +34,17 @@ class AuthenticationGateMiddleware:
         if app is None:
             await self.app(scope, receive, send)
             return
+        session = scope.get("session", {})
         try:
             with app.state.modern_session_factory() as db:
                 auth = load_auth_settings(db, app.state.settings)
+                if auth.require_login and session.get("user_id") and session.get("auth_backend") != "ldap":
+                    # A disabled local account must not keep bypassing the global
+                    # authentication gate with an already-issued session cookie.
+                    from app.local_accounts import is_local_user_enabled
+
+                    if not is_local_user_enabled(db, int(session["user_id"])):
+                        session.clear()
         except Exception:
             auth = None
         if not auth or not auth.require_login:
@@ -44,7 +52,7 @@ class AuthenticationGateMiddleware:
             return
 
         path = scope.get("path", "/")
-        if self._is_exempt(path) or session_has_identity(scope.get("session", {})):
+        if self._is_exempt(path) or session_has_identity(session):
             await self.app(scope, receive, send)
             return
 

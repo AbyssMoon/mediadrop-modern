@@ -9,9 +9,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.audit import audit_event
 from app.database import db_dependency
 from app.i18n import LOCALES
+from app.local_accounts import is_local_user_enabled, set_local_user_enabled, set_modern_password
 from app.models import Category, Comment, Group, Media, MediaFile, Podcast, Tag, User
+from app.modern_database import modern_db_dependency
 from app.security import AuthPrincipal, hash_legacy_password, require_admin, require_editor, validate_csrf
 from app.site_settings import get_site_settings, set_setting
 from app.services import (
@@ -32,6 +35,7 @@ from app.views import render
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 Db = Depends(db_dependency)
+ModernDb = Depends(modern_db_dependency)
 
 
 def _guard(request: Request, db: Session) -> AuthPrincipal:
@@ -246,6 +250,7 @@ def media_create(
         db.rollback()
         raise HTTPException(400, str(exc)) from exc
     db.commit()
+    audit_event(request, "media.create", principal=principal, object_type="media", object_id=media.id, details={"title": media.title})
     return RedirectResponse(
         f"/admin/media/{media.id}/edit", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -282,7 +287,7 @@ def media_save(
     thumbnail: UploadFile | None = File(None),
     db: Session = Db,
 ):
-    _guard(request, db)
+    principal = _guard(request, db)
     validate_csrf(request, csrf)
     media = _media_for_edit(db, media_id)
     description_html, description_plain = sanitize_description(description)
@@ -318,6 +323,7 @@ def media_save(
     if any(f.type in {"video", "audio"} for f in media.files):
         media.encoded = True
     db.commit()
+    audit_event(request, "media.update", principal=principal, object_type="media", object_id=media.id, details={"title": media.title})
     return RedirectResponse(
         f"/admin/media/{media.id}/edit", status_code=status.HTTP_303_SEE_OTHER
     )
@@ -330,7 +336,7 @@ def media_delete(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _guard(request, db)
+    principal = _guard(request, db)
     validate_csrf(request, csrf)
     media = _media_for_edit(db, media_id)
     paths: list[Path] = []
@@ -346,6 +352,7 @@ def media_delete(
         if media_file_is_modern(request.app.state.settings, path):
             path.unlink(missing_ok=True)
     delete_modern_thumbnails(request.app.state.settings, media_id)
+    audit_event(request, "media.delete", principal=principal, object_type="media", object_id=media_id)
     return RedirectResponse("/admin/media", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -370,7 +377,7 @@ def comment_approve(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _guard(request, db)
+    principal = _guard(request, db)
     validate_csrf(request, csrf)
     comment = db.get(Comment, comment_id)
     if comment is None:
@@ -378,6 +385,7 @@ def comment_approve(
     comment.reviewed = True
     comment.publishable = True
     db.commit()
+    audit_event(request, "comment.approve", principal=principal, object_type="comment", object_id=comment_id)
     return RedirectResponse("/admin/comments", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -388,13 +396,14 @@ def comment_delete(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _guard(request, db)
+    principal = _guard(request, db)
     validate_csrf(request, csrf)
     comment = db.get(Comment, comment_id)
     if comment is None:
         raise HTTPException(404)
     db.delete(comment)
     db.commit()
+    audit_event(request, "comment.delete", principal=principal, object_type="comment", object_id=comment_id)
     return RedirectResponse("/admin/comments", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -414,7 +423,7 @@ def category_create(
     parent_id: int | None = Form(None),
     db: Session = Db,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     _validate_category_parent(db, None, parent_id)
     name = name.strip()
@@ -423,8 +432,10 @@ def category_create(
     slug = slugify(name)[:50]
     if db.scalar(select(Category.id).where(Category.slug == slug)) is not None:
         raise HTTPException(409, "Category slug already exists")
-    db.add(Category(name=name, slug=slug, parent_id=parent_id or None))
+    category = Category(name=name, slug=slug, parent_id=parent_id or None)
+    db.add(category)
     db.commit()
+    audit_event(request, "category.create", principal=principal, object_type="category", object_id=category.id, details={"name": category.name})
     return RedirectResponse("/admin/categories", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -452,7 +463,7 @@ def category_save(
     parent_id: int | None = Form(None),
     db: Session = Db,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     category = db.get(Category, category_id)
     if category is None:
@@ -477,6 +488,7 @@ def category_save(
     category.slug = normalized_slug
     category.parent_id = parent_id or None
     db.commit()
+    audit_event(request, "category.update", principal=principal, object_type="category", object_id=category.id, details={"name": category.name})
     return RedirectResponse("/admin/categories", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -487,13 +499,14 @@ def category_delete(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     category = db.get(Category, category_id)
     if category is None:
         raise HTTPException(404)
     db.delete(category)
     db.commit()
+    audit_event(request, "category.delete", principal=principal, object_type="category", object_id=category_id)
     return RedirectResponse("/admin/categories", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -512,13 +525,15 @@ def podcast_create(
     description: str = Form(""),
     db: Session = Db,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     slug = slugify(title)[:50]
     if db.scalar(select(Podcast.id).where(Podcast.slug == slug)) is not None:
         raise HTTPException(409, "Podcast slug already exists")
-    db.add(Podcast(title=title, slug=slug, description=description, author_name="", author_email=""))
+    podcast = Podcast(title=title, slug=slug, description=description, author_name="", author_email="")
+    db.add(podcast)
     db.commit()
+    audit_event(request, "podcast.create", principal=principal, object_type="podcast", object_id=podcast.id, details={"title": podcast.title})
     return RedirectResponse("/admin/podcasts", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -529,7 +544,7 @@ def podcast_delete(
     csrf: str = Form(...),
     db: Session = Db,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     podcast = db.get(Podcast, podcast_id)
     if podcast is None:
@@ -540,11 +555,12 @@ def podcast_delete(
     )
     db.delete(podcast)
     db.commit()
+    audit_event(request, "podcast.delete", principal=principal, object_type="podcast", object_id=podcast_id)
     return RedirectResponse("/admin/podcasts", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/users", response_class=HTMLResponse)
-def users(request: Request, db: Session = Db):
+def users(request: Request, db: Session = Db, modern_db: Session = ModernDb):
     _admin_guard(request, db)
     rows = list(
         db.scalars(
@@ -553,13 +569,20 @@ def users(request: Request, db: Session = Db):
             .order_by(User.user_name)
         ).all()
     )
-    return render(request, "admin/users.html", users=rows)
+    enabled_by_id = {user.id: is_local_user_enabled(modern_db, user.id) for user in rows}
+    return render(request, "admin/users.html", users=rows, enabled_by_id=enabled_by_id)
 
 
 @router.get("/users/new", response_class=HTMLResponse)
 def user_new(request: Request, db: Session = Db):
     _admin_guard(request, db)
-    return render(request, "admin/user_form.html", user=None, groups=_user_groups(db))
+    return render(
+        request,
+        "admin/user_form.html",
+        user=None,
+        groups=_user_groups(db),
+        user_enabled=True,
+    )
 
 
 @router.post("/users/new")
@@ -570,10 +593,12 @@ def user_create(
     email_address: str = Form(..., min_length=3, max_length=255),
     display_name: str = Form("", max_length=255),
     password: str = Form(..., min_length=8, max_length=256),
+    enabled: str | None = Form("on"),
     group_ids: list[int] = Form(default=[]),
     db: Session = Db,
+    modern_db: Session = ModernDb,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     user_name = user_name.strip()
     email_address = email_address.strip()
@@ -588,12 +613,22 @@ def user_create(
     )
     user.groups = _selected_groups(db, group_ids)
     db.add(user)
+    db.flush()
+    set_modern_password(modern_db, user.id, password)
+    set_local_user_enabled(modern_db, user.id, enabled is not None)
     db.commit()
+    modern_db.commit()
+    audit_event(request, "user.create", principal=principal, object_type="user", object_id=user.id, details={"username": user.user_name, "enabled": enabled is not None})
     return RedirectResponse(f"/admin/users/{user.id}/edit", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/users/{user_id:int}/edit", response_class=HTMLResponse)
-def user_edit(request: Request, user_id: int, db: Session = Db):
+def user_edit(
+    request: Request,
+    user_id: int,
+    db: Session = Db,
+    modern_db: Session = ModernDb,
+):
     _admin_guard(request, db)
     user = db.scalar(
         select(User)
@@ -602,7 +637,13 @@ def user_edit(request: Request, user_id: int, db: Session = Db):
     )
     if user is None:
         raise HTTPException(404)
-    return render(request, "admin/user_form.html", user=user, groups=_user_groups(db))
+    return render(
+        request,
+        "admin/user_form.html",
+        user=user,
+        groups=_user_groups(db),
+        user_enabled=is_local_user_enabled(modern_db, user.id),
+    )
 
 
 @router.post("/users/{user_id:int}/edit")
@@ -614,10 +655,12 @@ def user_save(
     email_address: str = Form(..., min_length=3, max_length=255),
     display_name: str = Form("", max_length=255),
     password: str = Form("", max_length=256),
+    enabled: str | None = Form(None),
     group_ids: list[int] = Form(default=[]),
     db: Session = Db,
+    modern_db: Session = ModernDb,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     user = db.scalar(select(User).where(User.id == user_id).options(selectinload(User.groups)))
     if user is None:
@@ -634,8 +677,12 @@ def user_save(
         if len(password) < 8:
             raise HTTPException(400, "Password must be at least 8 characters")
         user.password = hash_legacy_password(password)
+        set_modern_password(modern_db, user.id, password)
+    set_local_user_enabled(modern_db, user.id, enabled is not None)
     user.groups = _selected_groups(db, group_ids)
     db.commit()
+    modern_db.commit()
+    audit_event(request, "user.update", principal=principal, object_type="user", object_id=user.id, details={"username": user.user_name, "enabled": enabled is not None, "password_changed": bool(password)})
     return RedirectResponse(f"/admin/users/{user.id}/edit", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -679,7 +726,7 @@ def settings_save(
     footer_text: str = Form("", max_length=500),
     db: Session = Db,
 ):
-    _admin_guard(request, db)
+    principal = _admin_guard(request, db)
     validate_csrf(request, csrf)
     if primary_language not in LOCALES:
         raise HTTPException(400, "Unsupported language")
@@ -704,5 +751,6 @@ def settings_save(
     set_setting(db, "modern_accent_color", accent_color.lower())
     set_setting(db, "modern_footer_text", footer_text.strip())
     db.commit()
+    audit_event(request, "settings.update", principal=principal, object_type="settings")
     return RedirectResponse("/admin/settings?saved=1", status_code=status.HTTP_303_SEE_OTHER)
 

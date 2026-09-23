@@ -1,6 +1,6 @@
-{% macro video_player(src, poster=None, allow_wide=false) -%}
-<div class="enhanced-player" data-enhanced-player tabindex="0">
-  <video data-player-video controls preload="metadata" playsinline {% if poster %}poster="{{ poster }}"{% endif %} src="{{ src }}"></video>
+{% macro video_player(src, poster=None, allow_wide=false, media_id=None) -%}
+<div class="enhanced-player" data-enhanced-player tabindex="0"{% if media_id %} data-play-audit-url="/api/media/{{ media_id }}/play" data-play-audit-csrf="{{ csrf_token }}"{% endif %}>
+  <video data-player-video controls {% if not site.show_download %}controlslist="nodownload"{% endif %} preload="metadata" playsinline {% if poster %}poster="{{ poster }}"{% endif %} src="{{ src }}"></video>
   <div class="player-tools" role="group" aria-label="{{ t('player.extra_controls') }}">
     <button class="player-tool-button player-tool-button--seek" type="button" data-player-seek="-10" title="{{ t('player.rewind_10') }}" aria-label="{{ t('player.rewind_10') }}">
       <span aria-hidden="true">↶</span><span>10</span>
@@ -25,6 +25,20 @@
     </label>
 
     <span class="player-tools__spacer"></span>
+
+    <button class="player-tool-button player-tool-button--mute" type="button" data-player-mute aria-pressed="false"
+      data-mute-label="{{ t('player.mute') }}"
+      data-unmute-label="{{ t('player.unmute') }}"
+      title="{{ t('player.mute') }}" aria-label="{{ t('player.mute') }}">
+      <span class="player-tool-button__icon" data-player-mute-icon aria-hidden="true">🔊</span><span class="player-tool-button__label">{{ t('player.sound') }}</span>
+    </button>
+
+    <button class="player-tool-button player-tool-button--fullscreen" type="button" data-player-fullscreen hidden aria-pressed="false"
+      data-enter-label="{{ t('player.fullscreen') }}"
+      data-exit-label="{{ t('player.fullscreen_exit') }}"
+      title="{{ t('player.fullscreen') }}" aria-label="{{ t('player.fullscreen') }}">
+      <span class="player-tool-button__icon" aria-hidden="true">⛶</span><span class="player-tool-button__label">{{ t('player.fullscreen_short') }}</span>
+    </button>
 
     {% if allow_wide %}
     <button class="player-tool-button player-tool-button--wide" type="button" data-player-wide aria-pressed="false"

@@ -8,7 +8,7 @@
     <a class="button" href="/admin/users/new">{{ t('admin.add_user') }}</a>
   </div>
   <div class="surface table-card"><div class="table-wrap"><table>
-    <thead><tr><th>{{ t('admin.id') }}</th><th>{{ t('admin.username') }}</th><th>{{ t('admin.email') }}</th><th>{{ t('admin.name') }}</th><th>{{ t('admin.groups') }}</th><th>{{ t('admin.permissions') }}</th><th>{{ t('admin.action') }}</th></tr></thead>
+    <thead><tr><th>{{ t('admin.id') }}</th><th>{{ t('admin.username') }}</th><th>{{ t('admin.email') }}</th><th>{{ t('admin.name') }}</th><th>{{ t('admin.status') }}</th><th>{{ t('admin.groups') }}</th><th>{{ t('admin.permissions') }}</th><th>{{ t('admin.action') }}</th></tr></thead>
     <tbody>
       {% for u in users %}
         {% set permissions = [] %}
@@ -18,6 +18,7 @@
           <td><strong>{{ u.user_name }}</strong></td>
           <td>{{ u.email_address }}</td>
           <td>{{ u.display_name or '—' }}</td>
+          <td>{% if enabled_by_id.get(u.id, True) %}<span class="status-badge status-badge--enabled">{{ t('admin.enabled') }}</span>{% else %}<span class="status-badge status-badge--disabled">{{ t('admin.disabled') }}</span>{% endif %}</td>
           <td>{% for group in u.groups %}<span class="mini-badge">{{ group.display_name or group.group_name }}</span>{% else %}—{% endfor %}</td>
           <td>{% for permission in permissions|sort %}<code class="permission-code">{{ permission }}</code>{% else %}—{% endfor %}</td>
           <td><a class="table-action" href="/admin/users/{{ u.id }}/edit">{{ t('admin.edit') }}</a></td>

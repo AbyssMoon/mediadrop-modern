@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     page_size: int = 20
     locale: str = "en"
 
+    # Security/audit events only: authentication and state-changing actions.
+    audit_log_path: Path = Path("/data/logs/audit.log")
+    audit_log_max_bytes: int = 20 * 1024 * 1024
+    audit_log_backup_count: int = 10
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.audit import audit_event
 from app.auth_config import (
     AuthSettings,
     SESSION_TTL_OPTIONS,
@@ -67,7 +68,7 @@ def auth_settings_save(
     db: Session = Db,
     modern_db: Session = ModernDb,
 ):
-    require_admin(request, db)
+    principal = require_admin(request, db)
     validate_csrf(request, csrf)
     values = AuthSettings(
         require_login=require_login is not None,
@@ -110,4 +111,11 @@ def auth_settings_save(
             has_bind_password=bool(current.ldap_bind_password or ldap_bind_password),
             status_code=400,
         )
+    audit_event(
+        request,
+        "auth_settings.update",
+        principal=principal,
+        object_type="auth_settings",
+        details={"ldap_enabled": values.ldap_enabled, "require_login": values.require_login},
+    )
     return RedirectResponse("/admin/settings/auth?saved=1", status_code=status.HTTP_303_SEE_OTHER)

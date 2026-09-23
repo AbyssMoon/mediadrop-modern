@@ -128,11 +128,24 @@ def current_user(request: Request, db: Session) -> User | None:
     user_id = request.session.get("user_id")
     if not user_id:
         return None
-    return db.scalar(
+    user = db.scalar(
         select(User)
         .where(User.id == int(user_id))
         .options(selectinload(User.groups).selectinload(Group.permissions))
     )
+    if user is None:
+        return None
+
+    # Local account state lives in the modern sidecar DB so the legacy schema
+    # stays untouched. Re-check it on every request so disabling a user also
+    # invalidates an already-issued local session.
+    from app.local_accounts import is_local_user_enabled
+
+    with request.app.state.modern_session_factory() as modern_db:
+        if not is_local_user_enabled(modern_db, user.id):
+            request.session.clear()
+            return None
+    return user
 
 
 def current_principal(request: Request, db: Session) -> AuthPrincipal | None:

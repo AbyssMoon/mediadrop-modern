@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import db_dependency
 from app.models import Category, Comment, Media, MediaFile, Podcast, Setting, Tag, media_categories
-from app.security import validate_csrf
+from app.security import current_principal, validate_csrf
 from app.site_settings import get_site_settings
 from app.services import (
     available_slug,
@@ -279,6 +279,10 @@ def media_comment(
     site = get_site_settings(db, request.app.state.settings)
     if not site["comments_enabled"]:
         raise HTTPException(404)
+    principal = current_principal(request, db)
+    if principal is not None:
+        name = (principal.display_name or principal.username).strip()[:50]
+        email = (principal.email or "").strip()[:255]
     require_review = bool(site["require_comment_approval"])
     comment = Comment(
         media=media,
@@ -319,7 +323,7 @@ def serve_file(
     container: str,
     slug: str | None = None,
     download: bool = False,
-    db: Session = Db,
+    db: Session = Depends(db_dependency, scope="function"),
 ):
     media_file = db.scalar(
         select(MediaFile)

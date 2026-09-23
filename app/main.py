@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
 from app.access_middleware import AuthenticationGateMiddleware
+from app.audit import configure_audit_logging
 from app.config import Settings, get_settings
 from app.database import build_session_factory
 from app.modern_database import build_modern_session_factory
@@ -29,13 +30,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         settings.media_root.mkdir(parents=True, exist_ok=True)
         settings.image_root.mkdir(parents=True, exist_ok=True)
+        configure_audit_logging(settings)
         yield
         engine.dispose()
         modern_engine.dispose()
 
     app = FastAPI(
         title=settings.app_name,
-        version="0.5.4",
+        version="0.6.6",
         docs_url="/api/docs",
         redoc_url=None,
         lifespan=lifespan,

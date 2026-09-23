@@ -65,10 +65,26 @@
     }
   }
 
+  function supportsFullscreen(video) {
+    return Boolean(
+      typeof video.requestFullscreen === "function" ||
+      typeof video.webkitEnterFullscreen === "function"
+    );
+  }
+
+  function isFullscreen(video) {
+    return Boolean(
+      document.fullscreenElement === video ||
+      video.webkitDisplayingFullscreen
+    );
+  }
+
   async function toggleFullscreen(video) {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
+      } else if (video.webkitDisplayingFullscreen && typeof video.webkitExitFullscreen === "function") {
+        video.webkitExitFullscreen();
       } else if (typeof video.requestFullscreen === "function") {
         await video.requestFullscreen();
       } else if (typeof video.webkitEnterFullscreen === "function") {
@@ -79,11 +95,73 @@
     }
   }
 
+  function initPlayAudit(wrapper, video) {
+    const url = wrapper.dataset.playAuditUrl;
+    const csrf = wrapper.dataset.playAuditCsrf;
+    if (!url || !csrf) return;
+
+    const thresholdMs = 5000;
+    let playedMs = 0;
+    let startedAt = null;
+    let timer = null;
+    let sent = false;
+
+    const stopClock = () => {
+      if (startedAt !== null) {
+        playedMs += performance.now() - startedAt;
+        startedAt = null;
+      }
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const sendPlay = () => {
+      stopClock();
+      if (sent || playedMs < thresholdMs) return;
+      sent = true;
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {"X-CSRF-Token": csrf},
+        keepalive: true,
+      }).catch(() => {
+        // Playback must never be affected by audit logging failures.
+      });
+    };
+
+    const startClock = () => {
+      if (sent || startedAt !== null || video.paused || video.ended) return;
+      startedAt = performance.now();
+      const remaining = Math.max(0, thresholdMs - playedMs);
+      timer = window.setTimeout(() => {
+        if (startedAt !== null) {
+          playedMs += performance.now() - startedAt;
+          startedAt = performance.now();
+        }
+        sendPlay();
+      }, remaining);
+    };
+
+    video.addEventListener("playing", startClock);
+    ["pause", "waiting", "stalled", "ended", "emptied"].forEach((eventName) => {
+      video.addEventListener(eventName, () => {
+        stopClock();
+        if (!sent && playedMs >= thresholdMs) sendPlay();
+      });
+    });
+  }
+
   function initPlayer(wrapper) {
     const video = wrapper.querySelector("[data-player-video]");
     if (!video) return;
 
+    initPlayAudit(wrapper, video);
+
     const speed = wrapper.querySelector("[data-player-speed]");
+    const muteButton = wrapper.querySelector("[data-player-mute]");
+    const fullscreenButton = wrapper.querySelector("[data-player-fullscreen]");
     const pipButton = wrapper.querySelector("[data-player-pip]");
     const wideButton = wrapper.querySelector("[data-player-wide]");
     const watchPage = wrapper.closest("[data-watch-page]");
@@ -105,6 +183,46 @@
         );
         if (matchingOption) speed.value = value;
       });
+    }
+
+    if (muteButton) {
+      const muteIcon = muteButton.querySelector("[data-player-mute-icon]");
+      const syncMuteButton = () => {
+        const active = video.muted;
+        const label = active
+          ? muteButton.dataset.unmuteLabel
+          : muteButton.dataset.muteLabel;
+        muteButton.setAttribute("aria-pressed", String(active));
+        muteButton.setAttribute("aria-label", label);
+        muteButton.title = label;
+        if (muteIcon) muteIcon.textContent = active ? "🔇" : "🔊";
+      };
+
+      muteButton.addEventListener("click", () => {
+        video.muted = !video.muted;
+      });
+      video.addEventListener("volumechange", syncMuteButton);
+      syncMuteButton();
+    }
+
+    if (fullscreenButton && supportsFullscreen(video)) {
+      fullscreenButton.hidden = false;
+
+      const syncFullscreenButton = () => {
+        const active = isFullscreen(video);
+        const label = active
+          ? fullscreenButton.dataset.exitLabel
+          : fullscreenButton.dataset.enterLabel;
+        fullscreenButton.setAttribute("aria-pressed", String(active));
+        fullscreenButton.setAttribute("aria-label", label);
+        fullscreenButton.title = label;
+      };
+
+      fullscreenButton.addEventListener("click", () => toggleFullscreen(video));
+      document.addEventListener("fullscreenchange", syncFullscreenButton);
+      video.addEventListener("webkitbeginfullscreen", syncFullscreenButton);
+      video.addEventListener("webkitendfullscreen", syncFullscreenButton);
+      syncFullscreenButton();
     }
 
     if (wideButton && watchPage) {

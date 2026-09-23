@@ -10,7 +10,7 @@
         {% set poster = thumbnail_url(media, 'l') %}
         {% if playable %}
           {% if playable.type == 'audio' %}<div class="audio-art"><span>♪</span></div><audio controls preload="metadata" src="{{ file_url(playable, media.slug) }}"></audio>
-          {% else %}{{ video_player(file_url(playable, media.slug), poster, true) }}{% endif %}
+          {% else %}{{ video_player(file_url(playable, media.slug), poster, true, media.id) }}{% endif %}
         {% else %}<div class="player-empty"><span>▶</span><p>{{ t('media.no_file') }}</p></div>{% endif %}
       </div>
       <div class="watch-title-row">
@@ -51,7 +51,15 @@
         <div class="comment-list">{% for c in comments %}<article class="comment"><div class="avatar">{{ (c.author_name or '?')[0]|upper }}</div><div><div class="comment__author">{{ c.author_name }}</div><p>{{ c.body }}</p></div></article>{% else %}<p class="muted">{{ t('empty.comments') }}</p>{% endfor %}</div>
         <form class="comment-form" method="post" action="{{ media_url(media) | replace('/view','/comment') }}">
           <input type="hidden" name="csrf" value="{{ csrf_token }}">
-          <div class="form-grid"><label>{{ t('comment.name') }}<input name="name" required maxlength="50"></label><label>{{ t('comment.email') }}<input type="email" name="email"></label></div>
+          <div class="form-grid">
+            {% if principal %}
+            <label>{{ t('comment.name') }}<input name="name" required maxlength="50" value="{{ principal.display_name[:50] }}" readonly aria-readonly="true"></label>
+            <label>{{ t('comment.email') }}<input type="email" name="email" value="{{ principal.email }}" readonly aria-readonly="true"></label>
+            {% else %}
+            <label>{{ t('comment.name') }}<input name="name" required maxlength="50"></label>
+            <label>{{ t('comment.email') }}<input type="email" name="email"></label>
+            {% endif %}
+          </div>
           <label>{{ t('comment.body') }}<textarea name="body" required placeholder="{{ t('comment.placeholder') }}"></textarea></label>
           <button>{{ t('comment.submit') }}</button>
         </form>

@@ -1,3 +1,5 @@
+name: ${COMPOSE_PROJECT_NAME:-mediadrop-modern}
+
 services:
   db:
     image: mariadb:11.4
@@ -11,6 +13,7 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     volumes:
+      # Legacy-compatible MariaDB. This remains a Docker named volume on purpose.
       - mediadrop_db:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
@@ -41,20 +44,19 @@ services:
       MEDIA_SERVE_MODE: ${MEDIA_SERVE_MODE:-app}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-2047}
       MAX_THUMBNAIL_MB: ${MAX_THUMBNAIL_MB:-20}
+      AUDIT_LOG_PATH: ${AUDIT_LOG_PATH:-/data/logs/audit.log}
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
     volumes:
-      # Writable volumes for all new uploads made by the modern application.
-      - mediadrop_media:/data/media
-      - mediadrop_images:/data/images
-      # Modern-only auth/LDAP settings; legacy database remains untouched.
-      - mediadrop_modern:/data/modern
-      # Legacy archive remains read-only; the app falls back to it automatically.
-      - ${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/media:/data/legacy-media:ro
-      - ${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/images:/data/legacy-images:ro
+      # Writable data created by MediaDrop Modern.
+      - "${MODERN_DATA_ROOT:-/opt/mediadrop-modern-data}/media:/data/media"
+      - "${MODERN_DATA_ROOT:-/opt/mediadrop-modern-data}/images:/data/images"
+      - "${MODERN_DATA_ROOT:-/opt/mediadrop-modern-data}/modern:/data/modern"
+      - "${MODERN_DATA_ROOT:-/opt/mediadrop-modern-data}/logs:/data/logs"
+
+      # Existing legacy MediaDrop archive. Never write to these mounts.
+      - "${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/media:/data/legacy-media:ro"
+      - "${LEGACY_DATA_ROOT:-/opt/mediadrop_data}/images:/data/legacy-images:ro"
 
 volumes:
   mediadrop_db:
-  mediadrop_media:
-  mediadrop_images:
-  mediadrop_modern:

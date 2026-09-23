@@ -7,17 +7,19 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.audit import audit_event
 from app.auth_config import load_auth_settings
 from app.database import db_dependency
 from app.ldap_auth import authenticate_ldap
+from app.local_accounts import is_local_user_enabled, verify_local_password
 from app.models import Group, User
 from app.modern_database import modern_db_dependency
 from app.security import (
     login_ldap_user,
     login_user,
+    current_principal,
     logout_user,
     validate_csrf,
-    verify_legacy_password,
 )
 from app.views import render
 
@@ -70,6 +72,7 @@ def login_submit(
         ldap_identity = authenticate_ldap(auth, username.strip(), password)
         if ldap_identity is not None:
             login_ldap_user(request, ldap_identity)
+            audit_event(request, "login", username=ldap_identity.username, backend="ldap")
             if destination:
                 return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
             target = "/admin" if ldap_identity.permissions & {"edit", "admin"} else "/"
@@ -80,7 +83,18 @@ def login_submit(
         .where(or_(User.user_name == username, User.email_address == username))
         .options(selectinload(User.groups).selectinload(Group.permissions))
     )
-    if user is None or not verify_legacy_password(password, user.password):
+    if (
+        user is None
+        or not is_local_user_enabled(modern_db, user.id)
+        or not verify_local_password(modern_db, user, password)
+    ):
+        audit_event(
+            request,
+            "login",
+            username=username.strip(),
+            backend="ldap_or_local" if auth.ldap_enabled else "local",
+            outcome="failure",
+        )
         return render(
             request,
             "login.html",
@@ -89,7 +103,9 @@ def login_submit(
             next=destination or "",
             auth_values=auth,
         )
+    modern_db.commit()
     login_user(request, user)
+    audit_event(request, "login", username=user.user_name, backend="local")
     if destination:
         return RedirectResponse(destination, status_code=status.HTTP_303_SEE_OTHER)
     can_edit = user.has_permission("edit") or user.has_permission("admin") or any(
@@ -100,13 +116,17 @@ def login_submit(
 
 
 @router.post("/logout")
-def logout(request: Request, csrf: str = Form(...)):
+def logout(request: Request, csrf: str = Form(...), db: Session = Db):
     validate_csrf(request, csrf)
+    principal = current_principal(request, db)
+    audit_event(request, "logout", principal=principal)
     logout_user(request)
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/logout")
-def logout_legacy(request: Request):
+def logout_legacy(request: Request, db: Session = Db):
+    principal = current_principal(request, db)
+    audit_event(request, "logout", principal=principal)
     logout_user(request)
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
