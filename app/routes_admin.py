@@ -14,7 +14,7 @@ from app.database import db_dependency
 from app.i18n import LOCALES
 from app.local_accounts import is_local_user_enabled, set_local_user_enabled, set_modern_password
 from app.models import Category, Comment, Group, Media, MediaFile, Podcast, Tag, User
-from app.modern_database import modern_db_dependency
+from app.modern_database import MediaVote, modern_db_dependency
 from app.security import AuthPrincipal, hash_legacy_password, require_admin, require_editor, validate_csrf
 from app.site_settings import get_site_settings, set_setting
 from app.services import (
@@ -335,6 +335,7 @@ def media_delete(
     media_id: int,
     csrf: str = Form(...),
     db: Session = Db,
+    modern_db: Session = ModernDb,
 ):
     principal = _guard(request, db)
     validate_csrf(request, csrf)
@@ -346,7 +347,9 @@ def media_delete(
                 paths.append(media_file_path(request.app.state.settings, media_file))
             except ValueError:
                 pass
+    modern_db.execute(delete(MediaVote).where(MediaVote.media_id == media_id))
     db.delete(media)
+    modern_db.commit()
     db.commit()
     for path in paths:
         if media_file_is_modern(request.app.state.settings, path):
@@ -354,6 +357,46 @@ def media_delete(
     delete_modern_thumbnails(request.app.state.settings, media_id)
     audit_event(request, "media.delete", principal=principal, object_type="media", object_id=media_id)
     return RedirectResponse("/admin/media", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.get("/votes", response_class=HTMLResponse)
+def votes(request: Request, db: Session = Db):
+    _guard(request, db)
+    rows = list(
+        db.scalars(
+            select(Media)
+            .where(or_(Media.likes > 0, Media.dislikes > 0))
+            .options(selectinload(Media.podcast))
+            .order_by(Media.likes.desc(), Media.dislikes.desc(), Media.title)
+            .limit(500)
+        ).all()
+    )
+    return render(request, "admin/votes.html", media=rows)
+
+
+@router.post("/votes/{media_id:int}/reset")
+def votes_reset(
+    request: Request,
+    media_id: int,
+    csrf: str = Form(...),
+    db: Session = Db,
+    modern_db: Session = ModernDb,
+):
+    principal = _guard(request, db)
+    validate_csrf(request, csrf)
+    media = db.get(Media, media_id)
+    if media is None:
+        raise HTTPException(404)
+    modern_db.execute(delete(MediaVote).where(MediaVote.media_id == media_id))
+    media.likes = 0
+    media.dislikes = 0
+    media.popularity_points = 0
+    media.popularity_likes = 0
+    media.popularity_dislikes = 0
+    modern_db.commit()
+    db.commit()
+    audit_event(request, "votes.reset", principal=principal, object_type="media", object_id=media_id)
+    return RedirectResponse("/admin/votes", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get("/comments", response_class=HTMLResponse)

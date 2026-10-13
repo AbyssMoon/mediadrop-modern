@@ -6,6 +6,7 @@
   <a class="{% if request.url.path in ['/admin','/admin/'] %}is-active{% endif %}" href="/admin">{{ t('admin.dashboard') }}</a>
   <a class="{% if request.url.path.startswith('/admin/media') %}is-active{% endif %}" href="/admin/media">{{ t('admin.media') }}</a>
   <a class="{% if request.url.path.startswith('/admin/comments') %}is-active{% endif %}" href="/admin/comments">{{ t('admin.comments') }}</a>
+  <a class="{% if request.url.path.startswith('/admin/votes') %}is-active{% endif %}" href="/admin/votes">{{ t('admin.votes') }}</a>
   {% if principal and principal.is_admin %}
     <a class="{% if request.url.path.startswith('/admin/categories') %}is-active{% endif %}" href="/admin/categories">{{ t('admin.categories') }}</a>
     <a class="{% if request.url.path.startswith('/admin/podcasts') %}is-active{% endif %}" href="/admin/podcasts">{{ t('admin.podcasts') }}</a>

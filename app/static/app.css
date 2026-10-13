@@ -206,6 +206,8 @@ button:hover, .button:hover { color: white; background: var(--primary-strong); b
 .watch-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .reaction-button { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 10px; background: white; color: #41506a; font-size: .8rem; font-weight: 750; box-shadow: var(--shadow-sm); }
 .reaction-button:hover { color: var(--primary); border-color: #c0ccef; }
+.reaction-button.is-active { color: var(--primary); border-color: #9eafe8; background: #eef2ff; box-shadow: inset 0 0 0 1px #cbd5f5; }
+.reaction-button:disabled { cursor: not-allowed; opacity: .55; }
 .reaction-button b { padding-left: 3px; color: var(--muted-2); font-size: .72rem; }
 .watch-actions form { display: flex; gap: 8px; }
 .surface { border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: var(--shadow-sm); }

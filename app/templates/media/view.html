@@ -22,8 +22,8 @@
           {% if site.show_like or site.show_dislike %}
           <form class="inline" method="post" action="{{ media_url(media) | replace('/view','/rate') }}">
             <input type="hidden" name="csrf" value="{{ csrf_token }}">
-            {% if site.show_like %}<button class="reaction-button" name="direction" value="up">♡ <span>{{ t('media.like') }}</span> <b>{{ media.likes }}</b></button>{% endif %}
-            {% if site.show_dislike %}<button class="reaction-button" name="direction" value="down">↓ <span>{{ t('media.dislike') }}</span></button>{% endif %}
+            {% if site.show_like %}<button class="reaction-button {% if user_vote == 'up' %}is-active{% endif %}" name="direction" value="up" {% if not principal %}disabled title="{{ t('media.login_to_vote') }}"{% endif %}>♥ <span>{{ t('media.like') }}</span> <b>{{ media.likes }}</b></button>{% endif %}
+            {% if site.show_dislike %}<button class="reaction-button {% if user_vote == 'down' %}is-active{% endif %}" name="direction" value="down" {% if not principal %}disabled title="{{ t('media.login_to_vote') }}"{% endif %}>↓ <span>{{ t('media.dislike') }}</span></button>{% endif %}
           </form>
           {% endif %}
           {% if playable and site.show_download %}<a class="reaction-button" href="{{ file_url(playable, media.slug) }}?download=true">⇩ <span>{{ t('media.download') }}</span></a>{% endif %}

@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import db_dependency
 from app.models import Category, Comment, Media, MediaFile, Podcast, Setting, Tag, media_categories
-from app.security import current_principal, validate_csrf
+from app.modern_database import MediaVote, modern_db_dependency
+from app.security import current_principal, require_authenticated, validate_csrf
 from app.site_settings import get_site_settings
 from app.services import (
     available_slug,
@@ -28,6 +29,7 @@ from app.views import playable_file, render
 
 router = APIRouter()
 Db = Depends(db_dependency)
+ModernDb = Depends(modern_db_dependency)
 
 
 def _site_setting(db: Session, key: str, default: str | None = None) -> str | None:
@@ -55,6 +57,10 @@ def _media_url(media: Media) -> str:
     return f"/media/{media.slug}/view"
 
 
+def _voter_key(principal) -> str:
+    if principal.backend == "local" and principal.local_user_id is not None:
+        return f"local:{principal.local_user_id}"
+    return f"{principal.backend}:{principal.username.casefold()}"
 
 
 @router.get("/language/{locale}")
@@ -206,6 +212,7 @@ def media_view(
     slug: str,
     podcast_slug: str | None = None,
     db: Session = Db,
+    modern_db: Session = ModernDb,
 ):
     stmt = (
         select(Media)
@@ -227,7 +234,24 @@ def media_view(
     db.commit()
     comments = [c for c in media.comments if c.reviewed and c.publishable]
     playable = playable_file(media)
-    return render(request, "media/view.html", media=media, playable=playable, comments=comments)
+    principal = current_principal(request, db)
+    user_vote = None
+    if principal is not None:
+        vote = modern_db.scalar(
+            select(MediaVote).where(
+                MediaVote.media_id == media.id,
+                MediaVote.voter_key == _voter_key(principal),
+            )
+        )
+        user_vote = vote.direction if vote is not None else None
+    return render(
+        request,
+        "media/view.html",
+        media=media,
+        playable=playable,
+        comments=comments,
+        user_vote=user_vote,
+    )
 
 
 @router.post("/media/{slug}/rate")
@@ -239,8 +263,10 @@ def media_rate(
     csrf: str = Form(...),
     direction: str = Form(...),
     db: Session = Db,
+    modern_db: Session = ModernDb,
 ):
     validate_csrf(request, csrf)
+    principal = require_authenticated(request, db)
     media = db.scalar(select(Media).where(Media.slug == slug).options(selectinload(Media.podcast)))
     if media is None or not media.is_published:
         raise HTTPException(404)
@@ -248,14 +274,47 @@ def media_rate(
     if direction == "up":
         if not site["show_like"]:
             raise HTTPException(404)
-        media.likes = (media.likes or 0) + 1
     elif direction == "down":
         if not site["show_dislike"]:
             raise HTTPException(404)
-        media.dislikes = (media.dislikes or 0) + 1
     else:
         raise HTTPException(400, "Invalid rating")
+
+    voter_key = _voter_key(principal)
+    vote = modern_db.scalar(
+        select(MediaVote).where(
+            MediaVote.media_id == media.id,
+            MediaVote.voter_key == voter_key,
+        )
+    )
+
+    if vote is not None and vote.direction == direction:
+        if direction == "up":
+            media.likes = max(0, (media.likes or 0) - 1)
+        else:
+            media.dislikes = max(0, (media.dislikes or 0) - 1)
+        modern_db.delete(vote)
+    elif vote is not None:
+        if vote.direction == "up":
+            media.likes = max(0, (media.likes or 0) - 1)
+        else:
+            media.dislikes = max(0, (media.dislikes or 0) - 1)
+        if direction == "up":
+            media.likes = (media.likes or 0) + 1
+        else:
+            media.dislikes = (media.dislikes or 0) + 1
+        vote.direction = direction
+    else:
+        modern_db.add(MediaVote(media_id=media.id, voter_key=voter_key, direction=direction))
+        if direction == "up":
+            media.likes = (media.likes or 0) + 1
+        else:
+            media.dislikes = (media.dislikes or 0) + 1
+
     media.popularity_points = (media.likes or 0) - (media.dislikes or 0)
+    media.popularity_likes = media.likes or 0
+    media.popularity_dislikes = media.dislikes or 0
+    modern_db.commit()
     db.commit()
     return RedirectResponse(_media_url(media), status_code=status.HTTP_303_SEE_OTHER)
 

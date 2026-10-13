@@ -3,9 +3,10 @@ from __future__ import annotations
 from collections.abc import Generator
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+from datetime import datetime
 
 from fastapi import Request
-from sqlalchemy import String, Text, create_engine, select
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from app.config import Settings
@@ -20,6 +21,20 @@ class ModernSetting(ModernBase):
 
     key: Mapped[str] = mapped_column(String(128), primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
+class MediaVote(ModernBase):
+    __tablename__ = "media_votes"
+    __table_args__ = (UniqueConstraint("media_id", "voter_key", name="uq_media_vote_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    media_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    voter_key: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    created_on: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now)
+    modified_on: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.now, onupdate=datetime.now
+    )
 
 
 def _ensure_sqlite_parent(database_url: str) -> None:

@@ -1,6 +1,6 @@
 # MediaDrop Modern migration notes
 
-Current release: **0.6.6**  
+Current release: **0.6.7**  
 Last updated: **2026-09-22**
 
 This document records the compatibility contract and the safe way to move an existing
@@ -404,3 +404,13 @@ pre-insert checks make interrupted runs resumable without duplicate playable row
   `docs/OPERATIONS_RU.md`.
 - The backup helper documentation now correctly describes media/images as bind mounts.
 - No legacy or modern database schema change is required for 0.6.6.
+
+
+### 0.6.7 per-user voting and vote administration
+
+- Added `media_votes` to the modern sidecar database. The table is created automatically on application startup.
+- One active reaction is stored per `(media_id, voter_key)`; clicking the same reaction again removes it, while clicking the opposite reaction switches it.
+- Existing aggregate `media.likes` / `media.dislikes` values are preserved during upgrade.
+- Added `/admin/votes` with per-video reset; reset also clears the legacy aggregate counters.
+- Deleting a media item also removes its sidecar vote rows.
+- No legacy MediaDrop schema migration is required.
