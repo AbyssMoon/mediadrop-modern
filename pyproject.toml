@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mediadrop-modern"
-version = "0.6.7"
+version = "0.6.8"
 description = "A modern Python 3 replacement backend for the legacy MediaDrop schema"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,6 +19,7 @@ dependencies = [
   "python-multipart>=0.0.20,<1",
   "PyMySQL>=1.1,<2",
   "bleach>=6.2,<7",
+  "Markdown>=3.7,<4",
   "Unidecode>=1.4,<2",
   "Pillow>=12,<13",
   "ldap3>=2.10,<3",

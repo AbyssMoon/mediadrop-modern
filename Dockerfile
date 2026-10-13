@@ -9,10 +9,10 @@ WORKDIR /app
 RUN addgroup --system mediadrop && adduser --system --ingroup mediadrop mediadrop \
     && mkdir -p /data/media /data/images /data/modern /data/logs /data/legacy-media /data/legacy-images && chown -R mediadrop:mediadrop /data
 
-COPY pyproject.toml README.md LICENSE /app/
+COPY pyproject.toml README.md LICENSE constraints.txt /app/
 COPY app /app/app
 COPY scripts /app/scripts
-RUN pip install --upgrade pip && pip install .
+RUN pip install --upgrade pip && pip install -c constraints.txt .
 
 USER mediadrop
 EXPOSE 8080

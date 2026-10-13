@@ -215,6 +215,15 @@ button:hover, .button:hover { color: white; background: var(--primary-strong); b
 .prose-panel h2, .comments-panel h2 { margin-bottom: 15px; font-size: 1.25rem; }
 .prose { max-width: 78ch; color: #39465c; line-height: 1.75; }
 .prose p { color: #39465c; }
+.media-description { overflow-wrap: anywhere; }
+.media-description > :first-child { margin-top: 0; }
+.media-description > :last-child { margin-bottom: 0; }
+.media-description p, .media-description ul, .media-description ol,
+.media-description blockquote, .media-description pre { margin-bottom: 1em; }
+.media-description ul, .media-description ol { padding-left: 1.5em; }
+.media-description h1, .media-description h2, .media-description h3,
+.media-description h4, .media-description h5, .media-description h6 { margin-top: 1em; margin-bottom: .5em; line-height: 1.3; }
+.media-description pre { overflow-x: auto; white-space: pre; }
 .watch-sidebar { grid-area: sidebar; position: sticky; top: 96px; display: grid; gap: 14px; align-self: start; }
 .watch-page--wide { width: min(1800px, calc(100% - 40px)); }
 .watch-page--wide .watch-layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage" "sidebar" "below"; gap: 18px; }

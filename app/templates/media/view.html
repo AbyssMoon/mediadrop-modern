@@ -43,7 +43,7 @@
     </aside>
 
     <div class="watch-below">
-      {% if media.description %}<div class="surface prose-panel"><h2>{{ t('media.about') }}</h2><div class="prose">{{ media.description|safe }}</div></div>{% endif %}
+      {% if media.description %}<div class="surface prose-panel"><h2>{{ t('media.about') }}</h2><div class="prose media-description">{{ media.description|description }}</div></div>{% endif %}
 
       {% if site.comments_enabled %}
       <section class="surface comments-panel">
