@@ -6,7 +6,7 @@ from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
-from app.description import render_description
+from app.description import description_preview, render_description
 from app.i18n import (
     LOCALES,
     format_date,
@@ -23,6 +23,7 @@ from app.site_settings import get_site_settings
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["description"] = render_description
+TEMPLATES.env.filters["description_preview"] = description_preview
 
 
 def media_url(media: Media) -> str:

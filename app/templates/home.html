@@ -11,7 +11,8 @@
     </a>
     <div class="home-media-row__body">
       <h3><a href="{{ media_url(item) }}">{{ item.title }}</a></h3>
-      {% if item.description_plain %}<p>{{ item.description_plain|truncate(105 if compact else 150, true, '…') }}</p>{% endif %}
+      {% set summary = (item.description or item.description_plain)|description_preview %}
+      {% if summary %}<p class="home-description">{{ summary }}</p>{% endif %}
       <div class="home-media-row__meta"><span class="view-dot">▶</span>{{ views_text(item.views) }}</div>
     </div>
   </article>
@@ -41,7 +42,8 @@
           </div>
           <div class="featured-media__body">
             <h1><a href="{{ media_url(featured) }}">{{ featured.title }}</a></h1>
-            {% if featured.description_plain %}<p>{{ featured.description_plain|truncate(190, true, '…') }}</p>{% endif %}
+            {% set summary = (featured.description or featured.description_plain)|description_preview %}
+            {% if summary %}<p class="home-description">{{ summary }}</p>{% endif %}
             <div class="featured-media__meta">
               <span>{{ views_text(featured.views) }}</span>
               {% if featured.comments %}<span>•</span><span>{{ featured.comments|length }} {{ t('section.comments')|lower }}</span>{% endif %}

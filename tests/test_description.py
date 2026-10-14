@@ -1,6 +1,6 @@
 import pytest
 
-from app.description import render_description
+from app.description import description_preview, render_description
 from app.models import Media
 from app.services import sanitize_description
 
@@ -52,3 +52,42 @@ def test_media_page_renders_without_rewriting_description(app_env):
     assert "First<br>\nSecond" in page.text
     with app.state.session_factory() as db:
         assert db.get(Media, 1).description == source
+
+
+@pytest.mark.parametrize(("source", "expected"), [
+    ("**Заголовок**\n\nПервая\nВторая", "Заголовок Первая Вторая"),
+    ("## Заголовок\n\n- Один\n- Два\n\n[Ссылка](https://example.com)", "Заголовок Один Два Ссылка"),
+    ("<p>Один<br>Два</p><p>Три &amp; четыре</p>", "Один Два Три & четыре"),
+    ("сло<strong>во</strong>", "слово"),
+    ("`code`\n\n&lt;b&gt;literal&lt;/b&gt;", "code <b>literal</b>"),
+    (None, ""),
+])
+def test_description_preview(source, expected):
+    result = description_preview(source)
+    assert result == expected
+    assert type(result) is str
+
+
+def test_home_plain_preview_preserves_full_description(app_env):
+    import re
+
+    app, client, _ = app_env
+    source = "**Heading**\n\nFirst\nSecond [Link](https://example.com) &lt;img src=x onerror=alert(1)&gt;"
+    with app.state.session_factory() as db:
+        media = db.get(Media, 1)
+        media.description, media.description_plain = sanitize_description(source)
+        db.commit()
+        stored = media.description
+    home = client.get("/")
+    previews = re.findall(r'<p class="home-description">(.*?)</p>', home.text)
+    assert len(previews) >= 2  # Featured and list rows use the same text filter.
+    for preview in previews:
+        assert preview.startswith("Heading First Second Link")
+        assert "**" not in preview and "https://" not in preview
+        assert "<img" not in preview and "&lt;img" in preview
+        assert "\n" not in preview
+    full = client.get("/media/sample-video/view")
+    assert "<strong>Heading</strong>" in full.text
+    assert "First<br>\nSecond" in full.text
+    with app.state.session_factory() as db:
+        assert db.get(Media, 1).description == stored

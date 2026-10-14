@@ -4,7 +4,7 @@ MediaDrop Modern is a Python 3 / FastAPI runtime for existing MediaDrop installa
 It keeps the legacy MediaDrop content schema and file layout where that helps migration,
 while replacing the old Python 2 / Pylons runtime with a small maintainable application.
 
-Current release: **0.6.8**.  
+Current release: **0.6.9**.
 Current automated suite: **43 passing tests**.
 
 For production installation and storage mapping, start with:
